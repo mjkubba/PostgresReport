@@ -43,3 +43,4 @@ Company Name: aws
 * convert to lambda friendly
 * create Cloudformation
 * work with hanishg@ for test DBs
+* make the html human readable
