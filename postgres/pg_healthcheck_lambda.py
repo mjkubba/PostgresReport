@@ -525,3 +525,10 @@ def lambda_handler(event, context):
   f.close()
   s3 = boto3.resource('s3')
   s3.meta.client.upload_file(filename, bucket, datetime.datetime.now().strftime("%m-%d-%Y") + "-report.html")
+  return {
+    "statusCode": 200,
+    "body": html,
+    "headers": {
+        'Content-Type': 'text/html',
+    }
+  }
