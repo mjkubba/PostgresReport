@@ -37,3 +37,9 @@ RDS Master User Name: postgres
 Password: mypass
 Company Name: aws
 ```
+
+### TODO:
+* refactor to functions
+* convert to lambda friendly
+* create Cloudformation
+* work with hanishg@ for test DBs
