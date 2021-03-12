@@ -24,58 +24,116 @@ import sys
 import boto3
 import os
 import subprocess
+import json
 
 subprocess.call('pip install psycopg2-binary -t /tmp/ --no-cache-dir'.split(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 sys.path.insert(1, '/tmp/')
 import psycopg2
 
-def lambda_handler(event, context):
+def check_input(input_obj):
+    if "secret" in input_obj:
+        return(True)
+    else:
+        if "endpoint" not in input_obj:
+            print("missing endpoint")
+            return(False)
+        elif "dbname" not in input_obj:
+            print("missing dbname")
+            return(False)
+        elif "rdsport" not in input_obj:
+            print("missing rdsport")
+            return(False)
+        elif "masteruser" not in input_obj:
+            print("missing masteruser")
+            return(False)
+        elif "comname" not in input_obj:
+            print("missing comname")
+            return(False)
+        elif "mypass" not in input_obj:
+            print("missing mypass")
+            return(False)
+        else:
+            return(True)
 
-    endpoint = ""
-    dbname = ""
-    rdsport = ""
-    masteruser = ""
-    comname = ""
-    mypass= ""
+def table_creator(top, headers, cur, sql):
+    html = """<font face="verdana" color="#ff6600"> """ + top + """ </font>"""
+    html = html + "<br>"
+    html = html + """<table border="1"><tr>"""
+    for head in headers:
+        html = html + "<th>" + head + "</th>"
+    html = html + "</tr>"
+    try:
+        cur.execute(sql)
+        for item in cur.fetchall():
+            html = html + "<tr>"
+            for col in item:
+                html = html + "<td>"+str(col)+"</td>"
+            html = html + "</tr>"
+    except psycopg2.errors.UndefinedFunction:
+        cur.execute("ROLLBACK")
+        pass
+    html = html + "</td></tr></table>"
+    html = html + "<br>"
+    html = html + "<br>"
+    return(html)
+
+def lambda_handler(event, context):
+    if event["body"]:
+        input_validator=check_input(json.loads(event["body"]))
+        db_obj = json.loads(event["body"])
+    elif event["queryStringParameters"]:
+        input_validator=check_input(event["queryStringParameters"])
+        db_obj = event["queryStringParameters"]
+    else:
+        input_validator=False
+    if not input_validator:
+        return {
+            "statusCode": 400,
+            "body": "missing input",
+            "headers": {
+                'Content-Type': 'text/html',
+            }
+        }
+
     rdsclient = boto3.client('rds')
 
-    """Check for inputs and exit if missing."""
-    if "ENDPOINT" in os.environ:
-        endpoint = os.getenv("ENDPOINT")
-    else:
-        print("ENDPOINT not found in ENV")
+    # """Check for inputs and exit if missing."""
+    # if "ENDPOINT" in os.environ:
+    #     endpoint = os.getenv("ENDPOINT")
+    # else:
+    #     print("ENDPOINT not found in ENV")
+    #
+    # if "DBNAME" in os.environ:
+    #     dbname = os.getenv("DBNAME")
+    # else:
+    #     print("DBNAME not found in ENV")
+    #
+    # if "DBPORT" in os.environ:
+    #     rdsport = os.getenv("DBPORT")
+    # else:
+    #     print("DBPORT not found in ENV")
+    #
+    # if "MASTERUSER" in os.environ:
+    #     masteruser = os.getenv("MASTERUSER")
+    # else:
+    #     print("MASTERUSER not found in ENV")
+    #
+    # if "MYPASS" in os.environ:
+    #     mypass = os.getenv("MYPASS")
+    # else:
+    #     print("MYPASS not found in ENV")
+    #
+    # if "COMNAME" in os.environ:
+    #     comname = os.getenv("COMNAME")
+    # else:
+    #     print("COMNAME not found in ENV")
+    #
+    # if "BUCKET" in os.environ:
+    #     bucket = os.getenv("BUCKET")
+    # else:
+    #     print("BUCKET not found in ENV")
 
-    if "DBNAME" in os.environ:
-        dbname = os.getenv("DBNAME")
-    else:
-        print("DBNAME not found in ENV")
-
-    if "DBPORT" in os.environ:
-        rdsport = os.getenv("DBPORT")
-    else:
-        print("DBPORT not found in ENV")
-
-    if "MASTERUSER" in os.environ:
-        masteruser = os.getenv("MASTERUSER")
-    else:
-        print("MASTERUSER not found in ENV")
-
-    if "MYPASS" in os.environ:
-        mypass = os.getenv("MYPASS")
-    else:
-        print("MYPASS not found in ENV")
-
-    if "COMNAME" in os.environ:
-        comname = os.getenv("COMNAME")
-    else:
-        print("COMNAME not found in ENV")
-
-    if "BUCKET" in os.environ:
-        bucket = os.getenv("BUCKET")
-    else:
-        print("BUCKET not found in ENV")
-
-    rdsname = endpoint.split(".")[0]
+    rdsname = db_obj["endpoint"].split(".")[0]
 
 
     sql1="select count(*) from pg_stat_activity where state='idle';"
@@ -214,8 +272,8 @@ def lambda_handler(event, context):
     #Top 10 short queries causing high write IOPS
     sql14="""SELECT
       left(query, 50) AS short_query
-     ,calls
      ,round(total_time::numeric, 2) AS total_time
+     ,calls
      ,rows
      ,calls*total_time*rows as Volume
      FROM pg_stat_statements
@@ -259,26 +317,33 @@ def lambda_handler(event, context):
     html = html + """<body style="font-family:'Verdana'" bgcolor="#F8F8F8">"""
     html = html + """<fieldset>"""
     html = html + """<table><tr> <td width="20"></td> <td>"""
-    html = html + """<h1><font face="verdana" color="#0099cc"><center><u>PostgreSQL Health Report For """+ comname +"""</u></center></font></h1>"""
+    html = html + """<h1><font face="verdana" color="#0099cc"><center><u>PostgreSQL Health Report For """+ db_obj["comname"] +"""</u></center></font></h1>"""
     html = html + """<h3><font face="verdana">"""+ datetime.datetime.now().strftime("%c") +"""</h3></color>"""
     html = html + """</fieldset>"""
 
     html = html + "<br>"
     html = html + """<font face="verdana" color="#ff6600">Instance Details:  </font>"""
     html = html + "<br>"
-    html = html + "Postgres Endpoint URL:"+ endpoint+ ""
+    html = html + "Postgres Endpoint URL:"+ db_obj["endpoint"]
     html = html + "<br>"
 
     conn = psycopg2.connect(
-        host=endpoint,
-        database=dbname,
-        user=masteruser,
-        password=mypass,
-        port=rdsport)
+        host=db_obj["endpoint"],
+        database=db_obj["dbname"],
+        user=db_obj["masteruser"],
+        password=db_obj["mypass"],
+        port=db_obj["rdsport"])
 
     if (conn.status != 1):
         print("Not Running")
-        sys.exit(1)
+        return {
+            "statusCode": 404,
+            "body": "DB Not Running",
+            "headers": {
+                'Content-Type': 'text/html',
+            }
+        }
+
     cur = conn.cursor()
     html = html + "Postgres Engine Version: "
     cur.execute("SELECT version()")
@@ -297,7 +362,7 @@ def lambda_handler(event, context):
     html = html + str(cur.fetchone()[0]) + newline
     html = html + "<br>"
     html = html + "<br>"
-    # print(cur.fetchone())
+
     html = html + """<font face="verdana" color="#ff6600">Instance Configuration: </font>"""
     html = html + "<br>"
     html = html + "Publicly Accessible: "
@@ -342,195 +407,42 @@ def lambda_handler(event, context):
     html = html + """<font face="verdana" color="#ff6600">Maximum Used Transaction IDs:</font>""" + str(cur.fetchone()[0])
     html = html + "<br>"
     html = html + "<br>"
+
     cur.execute("SELECT count(*) from pg_database")
-    html = html + """<font face="verdana" color="#ff6600">Top 5 Databases Size ("""+str(cur.fetchone()[0])+"""):</font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>datname</th><th>db_size</th><th>pretty_db_size</th></tr>"""
-    cur.execute(sql2)
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td><td>"+str(item[2])+"</td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Top 5 Databases Size ("+str(cur.fetchone()[0]) + "):", ["datname", "db_size", "pretty_db_size"], cur, sql2)
+
     cur.execute("select count(*) from  pg_stat_user_tables")
-    html = html + """<font face="verdana" color="#ff6600">Top 10 Biggest Tables ("""+str(cur.fetchone()[0])+"""):</font>"""
-    html = html + "<br>"
+    html = html + table_creator("Top 10 Biggest Tables ("+str(cur.fetchone()[0]) + "):", ["table_schema", "table_name", "total_size", "data_size", "index_size"], cur, sql4)
 
-    html = html + """<table border="1"><tr><th>table_schema</th><th>table_name</th><th>total_size</th><th>data_size</th><th>index_size</th></tr>"""
-    cur.execute(sql4)
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td><td>"+str(item[2])+"</td><td>"+str(item[3])+"</td><td>"+str(item[4])+"</td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Duplicate Indexes: ", ["size", "idx1", "total_size", "idx2", "idx3"], cur, sql5)
 
-    html = html + """<font face="verdana" color="#ff6600">Duplicate Indexes: </font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>size</th><th>idx1</th><th>idx2</th><th>idx3</th></tr>"""
-    cur.execute(sql5)
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td><td>"+str(item[2])+"</td><td>"+str(item[3])+"</td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Unused Indexes: ", ["schemaname", "tablename", "indexname", "index_size"], cur, sql6)
 
-    html = html + """<font face="verdana" color="#ff6600">Unused Indexes: </font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>schemaname</th><th>tablename</th><th>indexname</th><th>index_size</th></tr>"""
-    cur.execute(sql6)
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td><td>"+str(item[2])+"</td><td>"+str(item[3])+"</td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Database Age: ", ["datname", "age"], cur, sql7)
 
-    html = html + """<font face="verdana" color="#ff6600">Database Age: </font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>datname</th><th>age</th></tr>"""
-    cur.execute(sql7)
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Top 10 Most Bloated Tables: ", ["current_database", "schemaname", "tbloat", "wastedbytes", "iname", "ibloat", "wastedibytes"], cur, sql8)
 
-    html = html + """<font face="verdana" color="#ff6600">Top 10 Most Bloated Tables: </font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>current_database</th><th>schemaname</th><th>tablename</th><th>tbloat</th><th>wastedbytes</th><th>iname</th><th>ibloat</th><th>wastedibytes</th></tr>"""
-    cur.execute(sql8)
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td><td>"+str(item[2])+"</td><td>"+str(item[3])+"</td><td>"+str(item[4])+"</td><td>"+str(item[5])+"</td><td>"+str(item[6])+"</td><td>"+str(item[7])+"</td></td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Top 10 Biggest Tables Last Vacuumed: ", ["schemaname", "relname", "last_vacuum", "date", "date", "date", "table_total_size"], cur, sql9)
 
-    html = html + """<font face="verdana" color="#ff6600">Top 10 Biggest Tables Last Vacuumed: </font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>schemaname</th><th>relname</th><th>last_vacuum</th><th>date</th><th>date</th><th>date</th><th>table_total_size</th></tr>"""
-    try:
-        cur.execute(sql9)
-        for item in cur.fetchall():
-            html = html + "<tr>"
-            html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td><td>"+str(item[2])+"</td><td>"+str(item[3])+"</td><td>"+str(item[4])+"</td><td>"+str(item[5])+"</td><td>"+str(item[6])+"</td></td>"
-            html = html + "</tr>"
-            html = html + "</td></tr></table>"
-    except psycopg2.errors.UndefinedFunction:
-        cur.execute("ROLLBACK")
-        pass
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Top 10 UPDATE/DELETE Tables: ", ["relname", "hit_percent", "delete_percent", "insert_percent"], cur, sql15)
 
-    html = html + """<font face="verdana" color="#ff6600">Top 10 UPDATE/DELETE Tables: </font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>relname</th><th>hit_percent</th><th>delete_percent</th><th>insert_percent</th></tr>"""
-    cur.execute(sql15)
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td><td>"+str(item[2])+"</td><td>"+str(item[3])+"</td></td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Top 10 Read IO Tables: ", ["relname", "hit_percent", "heap_blks_hit", "heap_blks_read"], cur, sql16)
 
-    html = html + """<font face="verdana" color="#ff6600">Top 10 Read IO Tables: </font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>relname</th><th>hit_percent</th><th>heap_blks_hit</th><th>heap_blks_read</th></tr>"""
-    cur.execute(sql16)
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td><td>"+str(item[2])+"</td><td>"+str(item[3])+"</td></td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Vacuum Parameters: ", ["name", "setting", "source", "context"], cur, "select name, setting, source, context from pg_settings where name like 'autovacuum%'")
 
-    html = html + """<font face="verdana" color="#ff6600">Vacuum Parameters: </font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>name</th><th>setting</th><th>source</th><th>context</th></tr>"""
-    cur.execute("select name, setting, source, context from pg_settings where name like 'autovacuum%'")
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td><td>"+str(item[2])+"</td><td>"+str(item[3])+"</td></td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Memory Parameters: ", ["name", "setting", "source", "context"], cur, sql10)
 
-    html = html + """<font face="verdana" color="#ff6600">Memory Parameters: </font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>name</th><th>setting</th><th>source</th><th>context</th></tr>"""
-    cur.execute(sql10)
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td><td>"+str(item[2])+"</td><td>"+str(item[3])+"</td></td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
-
-    html = html + """<font face="verdana" color="#ff6600">Performance Parameters: </font>"""
-    html = html + "<br>"
-    html = html + """<table border="1"><tr><th>name</th><th>setting</th></tr>"""
-    cur.execute(sql11)
-    for item in cur.fetchall():
-        html = html + "<tr>"
-        html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"</td>"
-        html = html + "</tr>"
-    html = html + "</td></tr></table>"
-    html = html + "<br>"
-    html = html + "<br>"
+    html = html + table_creator("Performance Parameters: ", ["name", "setting"], cur, sql11)
 
     cur.execute("select * FROM pg_extension")
     if "pg_stat_statements" in cur.fetchone():
 
-        html = html + """<font face="verdana" color="#ff6600">Top 10 CPU Consuming SQLs: </font>"""
-        html = html + "<br>"
-        html = html + """<table border="1"><tr><th>short_query</th><th>total_time</th><th>calls</th><th>mean</th><th>percentage_cpu</th></tr>"""
-        cur.execute(sql12)
-        for item in cur.fetchall():
-            html = html + "<tr>"
-            html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"<td>"+str(item[2])+"</td><td>"+str(item[3])+"</td><td>"+str(item[4])+"</td></td>"
-            html = html + "</tr>"
-        html = html + "</td></tr></table>"
-        html = html + "<br>"
-        html = html + "<br>"
+        html = html + table_creator("Top 10 CPU Consuming SQLs: ", ["short_query", "total_time", "calls", "mean", "percentage_cpu"], cur, sql12)
 
-        html = html + """<font face="verdana" color="#ff6600">Top 10 Read Queries: </font>"""
-        html = html + "<br>"
-        html = html + """<table border="1"><tr><th>short_query</th><th>total_time</th><th>calls</th><th>shared_blks_read</th><th>shared_blks_hit</th><th>hit_percent</th></tr>"""
-        cur.execute(sql13)
-        for item in cur.fetchall():
-            html = html + "<tr>"
-            html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"<td>"+str(item[2])+"</td><td>"+str(item[3])+"</td><td>"+str(item[4])+"</td><td>"+str(item[5])+"</td></td>"
-            html = html + "</tr>"
-        html = html + "</td></tr></table>"
-        html = html + "<br>"
-        html = html + "<br>"
+        html = html + table_creator("Top 10 Read Queries: ", ["short_query", "total_time", "calls", "shared_blks_read", "shared_blks_hit", "hit_percent"], cur, sql13)
 
-        html = html + """<font face="verdana" color="#ff6600">Top 10 Write Queries: </font>"""
-        html = html + "<br>"
-        html = html + """<table border="1"><tr><th>short_query</th><th>calls</th><th>total_time</th><th>rows</th><th>volume</th></tr>"""
-        cur.execute(sql14)
-        for item in cur.fetchall():
-            html = html + "<tr>"
-            html = html + "<td>"+str(item[0])+"</td><td>"+str(item[1])+"<td>"+str(item[2])+"</td><td>"+str(item[3])+"</td><td>"+str(item[4])+"</td>"
-            html = html + "</tr>"
-        html = html + "</td></tr></table>"
-        html = html + "<br>"
-        html = html + "<br>"
+        html = html + table_creator("Top 10 Write Queries: ", ["short_query", "total_time", "calls", "rows", "volume""], cur, sql14)
+
     else:
         html = html + "<br>"
         html = html + """<font face="verdana" color="#ff6600">Postgres extension pg_stat_statements is not installed. Installation of this extension is recommended. </font>"""
@@ -544,8 +456,10 @@ def lambda_handler(event, context):
     f = open(filename, "w")
     f.write(html)
     f.close()
-    s3 = boto3.resource('s3')
-    s3.meta.client.upload_file(filename, bucket, datetime.datetime.now().strftime("%m-%d-%Y") + "-report.html")
+    if "bucket" in db_obj:
+        s3 = boto3.resource('s3')
+        s3.meta.client.upload_file(filename, db_obj["bucket"], datetime.datetime.now().strftime("%m-%d-%Y") + "-report.html")
+
     return {
         "statusCode": 200,
         "body": html,
