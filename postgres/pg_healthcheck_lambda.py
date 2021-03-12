@@ -317,7 +317,7 @@ def lambda_handler(event, context):
     html = html + """<body style="font-family:'Verdana'" bgcolor="#F8F8F8">"""
     html = html + """<fieldset>"""
     html = html + """<table><tr> <td width="20"></td> <td>"""
-    html = html + """<h1><font face="verdana" color="#0099cc"><center><u>PostgreSQL Health Report For """+ db_obj["comname"] +"""</u></center></font></h1>"""
+    html = html + """<h1><font face="verdana" color="#0099cc"><center><u>PostgreSQL Health Report For """+ rdsname +"""</u></center></font></h1>"""
     html = html + """<h3><font face="verdana">"""+ datetime.datetime.now().strftime("%c") +"""</h3></color>"""
     html = html + """</fieldset>"""
 
@@ -329,7 +329,6 @@ def lambda_handler(event, context):
 
     conn = psycopg2.connect(
         host=db_obj["endpoint"],
-        database=db_obj["dbname"],
         user=db_obj["masteruser"],
         password=db_obj["mypass"],
         port=db_obj["rdsport"])
@@ -399,10 +398,12 @@ def lambda_handler(event, context):
     html = html + "<br>"
     html = html + "<br>"
     html = html + """<font face="verdana" color="#ff6600">Total Size of ALL Databases:  </font>"""
+
     cur.execute(sql3)
     html = html + str(cur.fetchone()[0]) + " Bytes" + newline
     html = html + "<br>"
     html = html + "<br>"
+
     cur.execute("SELECT to_char(max(age(datfrozenxid)),'FM9,999,999,999') FROM pg_database;")
     html = html + """<font face="verdana" color="#ff6600">Maximum Used Transaction IDs:</font>""" + str(cur.fetchone()[0])
     html = html + "<br>"
