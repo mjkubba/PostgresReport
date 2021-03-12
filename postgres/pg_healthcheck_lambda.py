@@ -96,46 +96,9 @@ def lambda_handler(event, context):
         }
 
     rdsclient = boto3.client('rds')
-
-    # """Check for inputs and exit if missing."""
-    # if "ENDPOINT" in os.environ:
-    #     endpoint = os.getenv("ENDPOINT")
-    # else:
-    #     print("ENDPOINT not found in ENV")
-    #
-    # if "DBNAME" in os.environ:
-    #     dbname = os.getenv("DBNAME")
-    # else:
-    #     print("DBNAME not found in ENV")
-    #
-    # if "DBPORT" in os.environ:
-    #     rdsport = os.getenv("DBPORT")
-    # else:
-    #     print("DBPORT not found in ENV")
-    #
-    # if "MASTERUSER" in os.environ:
-    #     masteruser = os.getenv("MASTERUSER")
-    # else:
-    #     print("MASTERUSER not found in ENV")
-    #
-    # if "MYPASS" in os.environ:
-    #     mypass = os.getenv("MYPASS")
-    # else:
-    #     print("MYPASS not found in ENV")
-    #
-    # if "COMNAME" in os.environ:
-    #     comname = os.getenv("COMNAME")
-    # else:
-    #     print("COMNAME not found in ENV")
-    #
-    # if "BUCKET" in os.environ:
-    #     bucket = os.getenv("BUCKET")
-    # else:
-    #     print("BUCKET not found in ENV")
-
     rdsname = db_obj["endpoint"].split(".")[0]
 
-
+    #Idle Connections
     sql1="select count(*) from pg_stat_activity where state='idle';"
 
       #Size of all databases

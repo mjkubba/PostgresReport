@@ -1,7 +1,8 @@
-AWSTemplateFormatVersion: 2010-09-09
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
 Resources:
-  ExecutionRole:
-    Type: AWS::IAM::Role
+  rdsFunction:
+    Type: AWS::Serverless::Function
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -10,72 +11,36 @@ Resources:
             Principal:
               Service: [lambda.amazonaws.com]
             Action: ['sts:AssumeRole']
-      Path: /
-      Policies:
-        - PolicyName: logs
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action: ['logs:*']
-                Resource: 'arn:aws:logs:*:*:*'
-        - PolicyName: s3pol
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action: ['s3:*']
-                Resource: '*'
-        - PolicyName: rdspol
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - "rds:describe*"
-                  - "rds:get*"
-                  - "rds:list*"
-                Resource: '*'
-  HelloWorldFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      AssumeRolePolicyDocument: !Ref ExecutionRole.Arn
       CodeUri: postgres/
       Handler: pg_healthcheck_lambda.lambda_handler
       Runtime: python3.8
-      Environment:
-        Variables:
-          ENDPOINT: ""
-          DBNAME: ""
-          DBPORT:
-          MASTERUSER: ""
-          MYPASS: ""
-          COMNAME: ""
-          BUCKET: ""
+      Timeout: 180
       Events:
-        HelloWorld:
-          Type: Api
+        rdsFunction:
+          Type: HttpApi
           Properties:
             Path: /
             Method: get
-
-Globals:
-  Function:
-    Timeout: 180
-
-
-
-
-Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+      Policies:
+      - Statement:
+        - Sid: logsPol
+          Effect: Allow
+          Action:
+          - logs:*
+          Resource: '*'
+        - Sid: s3Pol
+          Effect: Allow
+          Action:
+          - s3:*
+          Resource: '*'
+        - Sid: rdsPol
+          Effect: Allow
+          Action:
+          - rds:describe*
+          Resource: '*'
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0765ba559515af3f8
+        SubnetIds:
+          - subnet-0a34d3dc411a020c9
+          - subnet-0e0d5777a50dd7e2e
