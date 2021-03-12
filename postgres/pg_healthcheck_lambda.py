@@ -436,12 +436,9 @@ def lambda_handler(event, context):
 
     cur.execute("select * FROM pg_extension")
     if "pg_stat_statements" in cur.fetchone():
-
         html = html + table_creator("Top 10 CPU Consuming SQLs: ", ["short_query", "total_time", "calls", "mean", "percentage_cpu"], cur, sql12)
-
         html = html + table_creator("Top 10 Read Queries: ", ["short_query", "total_time", "calls", "shared_blks_read", "shared_blks_hit", "hit_percent"], cur, sql13)
-
-        html = html + table_creator("Top 10 Write Queries: ", ["short_query", "total_time", "calls", "rows", "volume""], cur, sql14)
+        html = html + table_creator("Top 10 Write Queries: ", ["short_query", "total_time", "calls", "rows", "volume"], cur, sql14)
 
     else:
         html = html + "<br>"
