@@ -56,7 +56,7 @@ Resources:
         HelloWorld:
           Type: Api
           Properties:
-            Path: /test
+            Path: /
             Method: get
 
 Globals:
