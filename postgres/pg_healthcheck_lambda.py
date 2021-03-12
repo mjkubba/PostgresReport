@@ -96,6 +96,8 @@ def lambda_handler(event, context):
         }
 
     rdsclient = boto3.client('rds')
+    s3 = boto3.resource('s3')
+    s3client = boto3.client('s3')
     rdsname = db_obj["endpoint"].split(".")[0]
 
     #Idle Connections
@@ -413,13 +415,20 @@ def lambda_handler(event, context):
     html = html + "<br>"
     html = html + "</td></tr></table></body></html>"
 
-    filename = "/tmp/" + datetime.datetime.now().strftime("%m-%d-%Y") + "-report.html"
+    filename = "/tmp/" + datetime.datetime.now().strftime("%m-%d-%Y-T%H:%M:%S") + "-report.html"
     f = open(filename, "w")
     f.write(html)
     f.close()
-    if "bucket" in db_obj:
-        s3 = boto3.resource('s3')
-        s3.meta.client.upload_file(filename, db_obj["bucket"], datetime.datetime.now().strftime("%m-%d-%Y") + "-report.html")
+
+    accountID = boto3.client('sts').get_caller_identity().get('Account')
+    bucket_name = "rds-reports-"+accountID
+    s3client.create_bucket(Bucket=bucket_name, ACL='private')
+    s3client.put_bucket_encryption(Bucket=bucket_name,
+    ServerSideEncryptionConfiguration={
+        'Rules': [{'ApplyServerSideEncryptionByDefault': {
+                    'SSEAlgorithm': 'AES256',
+                }}]})
+    s3.meta.client.upload_file(filename, bucket_name, datetime.datetime.now().strftime("%m-%d-%Y-T%H:%M:%S") + "-report.html")
 
     return {
         "statusCode": 200,

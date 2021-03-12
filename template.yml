@@ -38,6 +38,11 @@ Resources:
           Action:
           - rds:describe*
           Resource: '*'
+        - Sid: stsPol
+          Effect: Allow
+          Action:
+          - sts:getCallerIdentity
+          Resource: '*'
       VpcConfig:
         SecurityGroupIds:
           - sg-0765ba559515af3f8
