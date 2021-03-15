@@ -55,6 +55,36 @@ def check_input(input_obj):
         else:
             return(True)
 
+def get_secret(secret_name):
+    obj = {}
+    session = boto3.session.Session()
+    client = session.client(service_name='secretsmanager')
+
+    try:
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+    except ClientError as e:
+        raise e
+    else:
+        if 'SecretString' in get_secret_value_response:
+            tmp_obj = json.loads(get_secret_value_response['SecretString'])
+            print(tmp_obj["host"])
+            obj["endpoint"] = tmp_obj["host"]
+            obj["mypass"] = tmp_obj["password"]
+            obj["masteruser"] = tmp_obj["username"]
+            obj["rdsport"] = tmp_obj["port"]
+            return obj
+
+        else:
+            tmp_obj = json.loads(base64.b64decode(get_secret_value_response['SecretBinary']))
+            obj["endpoint"] = tmp_obj["host"]
+            obj["mypass"] = tmp_obj["password"]
+            obj["masteruser"] = tmp_obj["username"]
+            obj["rdsport"] = tmp_obj["port"]
+            return obj
+
+
 def table_creator(top, headers, cur, sql):
     html = """<font face="verdana" color="#ff6600"> """ + top + """ </font>"""
     html = html + "<br>"
@@ -77,13 +107,28 @@ def table_creator(top, headers, cur, sql):
     html = html + "<br>"
     return(html)
 
+def get_obj(event):
+    obj = []
+    if event["body"]:
+        event = json.loads(event["body"])
+        if "secret" in event:
+            return(get_secret(event["secret"]))
+        else:
+            return(event)
+    elif event["queryStringParameters"]:
+        if "secret" in event["queryStringParameters"]:
+            return(get_secret(event["queryStringParameters"]["secret"]))
+        else:
+            return(event["queryStringParameters"])
+
+
 def lambda_handler(event, context):
     if event["body"]:
         input_validator=check_input(json.loads(event["body"]))
-        db_obj = json.loads(event["body"])
+        db_obj = get_obj(event)
     elif event["queryStringParameters"]:
         input_validator=check_input(event["queryStringParameters"])
-        db_obj = event["queryStringParameters"]
+        db_obj = get_obj(event)
     else:
         input_validator=False
     if not input_validator:
