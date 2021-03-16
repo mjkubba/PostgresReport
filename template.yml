@@ -26,17 +26,24 @@ Resources:
         - Sid: logsPol
           Effect: Allow
           Action:
-          - logs:*
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
           Resource: '*'
         - Sid: s3Pol
           Effect: Allow
           Action:
-          - s3:*
-          Resource: '*'
+          - s3:CreateBucket
+          - s3:PutEncryptionConfiguration
+          - s3:PutObject
+          Resource:
+            - arn:aws:s3:::rds-reports-*
+            - arn:aws:s3:::rds-reports-*/*
         - Sid: rdsPol
           Effect: Allow
           Action:
-          - rds:describe*
+          - rds:DescribeDBInstances
+          - rds:DescribeDBLogFiles
           Resource: '*'
         - Sid: stsPol
           Effect: Allow

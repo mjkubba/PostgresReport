@@ -42,7 +42,7 @@ to start locally:
 * Refactor functions
 * ~~Check for and create S3 buckets~~
 * ~~Implement secret retrieval~~
-* limit the IAM to min required
+* ~~limit the IAM to min required~~
 * Work with hanishg@ for test DBs
 * Make the html human readable!
 * Add other regions

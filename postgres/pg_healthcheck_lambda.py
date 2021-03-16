@@ -66,7 +66,6 @@ def get_secret(secret_name):
     else:
         if 'SecretString' in get_secret_value_response:
             tmp_obj = json.loads(get_secret_value_response['SecretString'])
-            print(tmp_obj["host"])
             obj["endpoint"] = tmp_obj["host"]
             obj["mypass"] = tmp_obj["password"]
             obj["masteruser"] = tmp_obj["username"]
