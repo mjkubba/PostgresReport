@@ -74,6 +74,14 @@ def get_secret(secret_name):
             obj["mypass"] = tmp_obj["password"]
             obj["masteruser"] = tmp_obj["username"]
             obj["rdsport"] = tmp_obj["port"]
+            obj["dbname"] = tmp_obj["dbname"]
+            if "dbClusterIdentifier" in tmp_obj:
+                obj["id"] = tmp_obj["dbClusterIdentifier"]
+                obj["type"] = "aurora"
+            elif "dbInstanceIdentifier" in tmp_obj:
+                obj["id"] = tmp_obj["dbInstanceIdentifier"]
+                obj["type"] = "rds"
+
             return(False, obj)
 
         else:
@@ -83,6 +91,13 @@ def get_secret(secret_name):
             obj["mypass"] = tmp_obj["password"]
             obj["masteruser"] = tmp_obj["username"]
             obj["rdsport"] = tmp_obj["port"]
+            obj["dbname"] = tmp_obj["dbname"]
+            if "dbClusterIdentifier" in tmp_obj:
+                obj["id"] = tmp_obj["dbClusterIdentifier"]
+                obj["type"] = "aurora"
+            elif "dbInstanceIdentifier" in tmp_obj:
+                obj["id"] = tmp_obj["dbInstanceIdentifier"]
+                obj["type"] = "rds"
             return(False, obj)
 
 
@@ -396,7 +411,12 @@ def lambda_handler(event, context):
     html = html + """<font face="verdana" color="#ff6600">Instance Configuration: </font>"""
     html = html + "<br>"
     html = html + "Publicly Accessible: "
-    rds_details = rdsclient.describe_db_instances(DBInstanceIdentifier=rdsname)
+    if db_obj["type"] == "rds":
+        rds_details = rdsclient.describe_db_instances(DBInstanceIdentifier=db_obj["id"])
+    elif db_obj["type"] == "aurora":
+        rds_cluster = rdsclient.describe_db_clusters(DBClusterIdentifier=db_obj["id"])
+        db_obj["dbinstance"] = rds_cluster["DBClusters"][0]["DBClusterMembers"][0]["DBInstanceIdentifier"]
+        rds_details = rdsclient.describe_db_instances(DBInstanceIdentifier=db_obj["dbinstance"])
     html = html + str(rds_details["DBInstances"][0]["PubliclyAccessible"])
     html = html + "<br>"
     html = html + "EM Monitoring Interval: "
@@ -419,7 +439,10 @@ def lambda_handler(event, context):
     html = html + "<br>"
     html = html + "<br>"
     # Total Log Size
-    rds_log_details = rdsclient.describe_db_log_files(DBInstanceIdentifier=rdsname)
+    if db_obj["type"] == "rds":
+        rds_log_details = rdsclient.describe_db_log_files(DBInstanceIdentifier=db_obj["id"])
+    elif db_obj["type"] == "aurora":
+        rds_log_details = rdsclient.describe_db_log_files(DBInstanceIdentifier=db_obj["dbinstance"])
     AGB = 1073741824
     total_log_size = 0
     for log in rds_log_details["DescribeDBLogFiles"]:
@@ -488,12 +511,15 @@ def lambda_handler(event, context):
 
     accountID = boto3.client('sts').get_caller_identity().get('Account')
     bucket_name = "rds-reports-"+accountID
-    s3client.create_bucket(Bucket=bucket_name, ACL='private')
-    s3client.put_bucket_encryption(Bucket=bucket_name,
-                                   ServerSideEncryptionConfiguration={
-                                    'Rules': [{
-                                        'ApplyServerSideEncryptionByDefault': {
-                                                'SSEAlgorithm': 'AES256', }}]})
+    bucket = s3.Bucket(bucket_name)
+    if bucket.creation_date:
+       print("The bucket exists")
+    else:
+        s3client.create_bucket(Bucket=bucket_name, ACL='private', CreateBucketConfiguration={"LocationConstraint":aws_region})
+        s3client.put_bucket_encryption(Bucket=bucket_name,
+                                       ServerSideEncryptionConfiguration={
+                                        'Rules': [{'ApplyServerSideEncryptionByDefault': {
+                                                    'SSEAlgorithm': 'AES256', }}]})
     s3.meta.client.upload_file(filename, bucket_name,
                                datetime.datetime.now()
                                .strftime("%m-%d-%Y-T%H:%M:%S") + rdsname
