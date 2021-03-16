@@ -5,32 +5,34 @@
 # based on work of Vivek Singh
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-# Permission is hereby granted, free of charge, to any person obtaining a copy of
-# this software and associated documentation files (the "Software"), to deal in
-# the Software without restriction, including without limitation the rights to
-# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-# the Software, and to permit persons to whom the Software is furnished to do so.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so.
 
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
-import getpass
 import datetime
 import sys
 import boto3
-import os
 import subprocess
 import json
 import base64
 from botocore.exceptions import ClientError
 
-subprocess.call('pip install psycopg2-binary -t /tmp/ --no-cache-dir'.split(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+subprocess.call('pip install psycopg2-binary -t /tmp/ --no-cache-dir'.split(),
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 sys.path.insert(1, '/tmp/')
 import psycopg2
+
 
 def check_input(input_obj):
     if "secret" in input_obj:
@@ -50,6 +52,7 @@ def check_input(input_obj):
             return(False)
         else:
             return(True)
+
 
 def get_secret(secret_name):
     obj = {}
@@ -103,6 +106,7 @@ def table_creator(top, headers, cur, sql):
     html = html + "<br>"
     return(html)
 
+
 def get_obj(event):
     obj = []
     if "body" in event and event["body"]:
@@ -122,13 +126,13 @@ def get_obj(event):
 
 def lambda_handler(event, context):
     if "body" in event and event["body"]:
-        input_validator=check_input(json.loads(event["body"]))
+        input_validator = check_input(json.loads(event["body"]))
         err_check, db_obj = get_obj(event)
     elif "queryStringParameters" in event and event["queryStringParameters"]:
-        input_validator=check_input(event["queryStringParameters"])
+        input_validator = check_input(event["queryStringParameters"])
         err_check, db_obj = get_obj(event)
     else:
-        input_validator=False
+        input_validator = False
     if err_check:
         return {
             "statusCode": 400,
@@ -151,20 +155,20 @@ def lambda_handler(event, context):
     s3client = boto3.client('s3')
     rdsname = db_obj["endpoint"].split(".")[0]
 
-    #Idle Connections
-    sql1="select count(*) from pg_stat_activity where state='idle';"
+    # Idle Connections
+    sql1 = "select count(*) from pg_stat_activity where state='idle';"
 
-    #Size of all databases
-    sql2="""SELECT pg_database.datname,
+    # Size of all databases
+    sql2 = """SELECT pg_database.datname,
     pg_database_size(pg_database.datname) as "DB_Size",
     pg_size_pretty(pg_database_size(pg_database.datname)) as "Pretty_DB_size"
     FROM pg_database ORDER by 2 DESC limit 5;"""
 
-    #Size only of all databases
-    sql3="SELECT pg_database_size(pg_database.datname)  FROM pg_database"
+    # Size only of all databases
+    sql3 = "SELECT pg_database_size(pg_database.datname)  FROM pg_database"
 
-    #Top 10 biggest tables
-    sql4="""Select schemaname as table_schema,
+    # Top 10 biggest tables
+    sql4 = """Select schemaname as table_schema,
        relname as table_name,
        pg_size_pretty(pg_total_relation_size(relid)) as "Total_Size",
        pg_size_pretty(pg_relation_size(relid)) as "Data_Size",
@@ -175,8 +179,8 @@ def lambda_handler(event, context):
             pg_relation_size(relid) desc
     limit 10;"""
 
-    #Duplticate Indexes
-    sql5="""SELECT pg_size_pretty(SUM(pg_relation_size(idx))::BIGINT) AS SIZE,
+    # Duplticate Indexes
+    sql5 = """SELECT pg_size_pretty(SUM(pg_relation_size(idx))::BIGINT) AS SIZE,
          (array_agg(idx))[1] AS idx1, (array_agg(idx))[2] AS idx2,
          (array_agg(idx))[3] AS idx3, (array_agg(idx))[4] AS idx4
     FROM (
@@ -186,8 +190,8 @@ def lambda_handler(event, context):
     GROUP BY KEY HAVING COUNT(*)>1
     ORDER BY SUM(pg_relation_size(idx)) DESC;"""
 
-    #Unused Indexes
-    sql6="""SELECT s.schemaname,
+    # Unused Indexes
+    sql6 = """SELECT s.schemaname,
          s.relname AS tablename,
          s.indexrelname AS indexname,
          pg_size_pretty(pg_relation_size(s.indexrelid)) AS index_size
@@ -200,11 +204,11 @@ def lambda_handler(event, context):
             WHERE c.conindid = s.indexrelid)
     ORDER BY pg_relation_size(s.indexrelid) DESC limit 15;"""
 
-    #Database Age
-    sql7="select datname, ltrim(to_char(age(datfrozenxid), '999,999,999,999,999')) age from pg_database where datname not like 'rdsadmin';"
+    # Database Age
+    sql7 = "select datname, ltrim(to_char(age(datfrozenxid), '999,999,999,999,999')) age from pg_database where datname not like 'rdsadmin';"
 
-    #Most Bloated Tables
-    sql8="""SELECT
+    # Most Bloated Tables
+    sql8 = """SELECT
     current_database(), schemaname, tablename, /*reltuples::bigint, relpages::bigint, otta,*/
     ROUND((CASE WHEN otta=0 THEN 0.0 ELSE sml.relpages::FLOAT/otta END)::NUMERIC,1) AS tbloat,
     CASE WHEN relpages < otta THEN 0 ELSE bs*(sml.relpages-otta)::BIGINT END AS wastedbytes,
@@ -250,21 +254,21 @@ def lambda_handler(event, context):
     ) AS sml
     ORDER BY wastedbytes DESC LIMIT 10;"""
 
-    #Top 10 biggest tables last vacuumed
-    sql9="""SELECT
+    # Top 10 biggest tables last vacuumed
+    sql9 = """SELECT
     schemaname, relname,last_vacuum, cast(last_autovacuum as date), cast(last_analyze as date), cast(last_autoanalyze as date),
     pg_size_pretty(pg_total_relation_size(table_name)) as table_total_size
     from pg_stat_user_tables a, information_schema.tables b where a.relname=b.table_name ORDER BY pg_total_relation_size(table_name) DESC limit 10;"""
 
-    #Memory Parameters
-    sql10="""select name, setting, source, context from pg_settings where name like '%mem%' or name ilike '%buff%'; """
+    # Memory Parameters
+    sql10 = """select name, setting, source, context from pg_settings where name like '%mem%' or name ilike '%buff%'; """
 
-    #Performance Parameters
-    sql11="select name, setting from pg_settings where name IN ('shared_buffers', 'effective_cache_size', 'work_mem', 'maintenance_work_mem', 'default_statistics_target', 'random_page_cost', 'rds.logical_replication','wal_keep_segments');"
+    # Performance Parameters
+    sql11 = "select name, setting from pg_settings where name IN ('shared_buffers', 'effective_cache_size', 'work_mem', 'maintenance_work_mem', 'default_statistics_target', 'random_page_cost', 'rds.logical_replication','wal_keep_segments');"
 
-    #pg_stat_statements top queries
-    #Top 10 short queries consuming CPU
-    sql12="""SELECT substring(query, 1, 50) AS short_query,
+    # pg_stat_statements top queries
+    # Top 10 short queries consuming CPU
+    sql12 = """SELECT substring(query, 1, 50) AS short_query,
                 round(total_time::numeric, 2) AS total_time,
                 calls,
                 round(mean_time::numeric, 2) AS mean,
@@ -274,8 +278,8 @@ def lambda_handler(event, context):
     ORDER BY total_time DESC
     LIMIT 10;"""
 
-    #Top 10 short queries causing high Read IOPS
-    sql13="""SELECT
+    # Top 10 short queries causing high Read IOPS
+    sql13 = """SELECT
     left(query, 50) AS short_query
     ,round(total_time::numeric, 2) AS total_time
     ,calls
@@ -285,8 +289,8 @@ def lambda_handler(event, context):
     FROM  pg_stat_statements
     ORDER BY total_time DESC LIMIT 10;"""
 
-    #Top 10 short queries causing high write IOPS
-    sql14="""SELECT
+    # Top 10 short queries causing high write IOPS
+    sql14 = """SELECT
       left(query, 50) AS short_query
      ,round(total_time::numeric, 2) AS total_time
      ,calls
@@ -301,8 +305,8 @@ def lambda_handler(event, context):
       and query not like '%rds_heartbeat%'
     ORDER BY Volume DESC LIMIT 10;"""
 
-    #Top 10 UPDATE/DELETE tables
-    sql15="""SELECT relname
+    # Top 10 UPDATE/DELETE tables
+    sql15 = """SELECT relname
     ,round(upd_percent::numeric, 2) AS update_percent
     ,round(del_percent::numeric, 2) AS delete_percent
     ,round(ins_percent::numeric, 2) AS insert_percent
@@ -315,8 +319,8 @@ def lambda_handler(event, context):
     WHERE (n_tup_ins + n_tup_upd + n_tup_del) > 0
     ORDER BY coalesce(n_tup_upd,0)+coalesce(n_tup_del,0) desc ) a limit 10;"""
 
-    #Top 10 Read IO tables
-    sql16="""SELECT
+    # Top 10 Read IO tables
+    sql16 = """SELECT
     relname
     ,round((100.0 * heap_blks_hit/nullif(heap_blks_hit + heap_blks_read, 0))::numeric,2) AS hit_percent
     ,heap_blks_hit
@@ -326,7 +330,7 @@ def lambda_handler(event, context):
     ORDER BY coalesce(heap_blks_hit,0)+coalesce(heap_blks_read,0) desc limit 10;"""
 
     newline = "\n"
-    #Generating HTML file
+    # Generating HTML file
     html = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">"""
     html = html + "<html>"
     html = html + """<link rel="stylesheet" href="https://unpkg.com/purecss@0.6.2/build/pure-min.css">"""
@@ -403,9 +407,9 @@ def lambda_handler(event, context):
     html = html + str(rds_details["DBInstances"][0]["DBInstanceClass"])
     html = html + "<br>"
     html = html + "<br>"
-    #Total Log Size
+    # Total Log Size
     rds_log_details = rdsclient.describe_db_log_files(DBInstanceIdentifier=rdsname)
-    AGB=1073741824
+    AGB = 1073741824
     total_log_size = 0
     for log in rds_log_details["DescribeDBLogFiles"]:
         total_log_size = total_log_size + log["Size"]
@@ -475,10 +479,10 @@ def lambda_handler(event, context):
     bucket_name = "rds-reports-"+accountID
     s3client.create_bucket(Bucket=bucket_name, ACL='private')
     s3client.put_bucket_encryption(Bucket=bucket_name,
-    ServerSideEncryptionConfiguration={
-        'Rules': [{'ApplyServerSideEncryptionByDefault': {
-                    'SSEAlgorithm': 'AES256',
-                }}]})
+                                   ServerSideEncryptionConfiguration={
+                                    'Rules': [{'ApplyServerSideEncryptionByDefault': {
+                                                'SSEAlgorithm': 'AES256',
+                                            }}]})
     s3.meta.client.upload_file(filename, bucket_name, datetime.datetime.now().strftime("%m-%d-%Y-T%H:%M:%S") + rdsname + "-report.html")
 
     return {
