@@ -76,7 +76,8 @@ def get_secret(secret_name):
             return(False, obj)
 
         else:
-            tmp_obj = json.loads(base64.b64decode(get_secret_value_response['SecretBinary']))
+            tmp_obj = json.loads(base64.b64decode(get_secret_value_response
+                                                  ['SecretBinary']))
             obj["endpoint"] = tmp_obj["host"]
             obj["mypass"] = tmp_obj["password"]
             obj["masteruser"] = tmp_obj["username"]
@@ -118,7 +119,8 @@ def get_obj(event):
             return(False, event)
     elif "queryStringParameters" in event and event["queryStringParameters"]:
         if "secret" in event["queryStringParameters"]:
-            err_check, db_obj = get_secret(event["queryStringParameters"]["secret"])
+            err_check, db_obj = get_secret(event["queryStringParameters"]
+                                                ["secret"])
             return(err_check, db_obj)
         else:
             return(False, event["queryStringParameters"])
@@ -346,13 +348,21 @@ def lambda_handler(event, context):
     html = html + "<br>"
     html = html + "Postgres Endpoint URL:"+ db_obj["endpoint"]
     html = html + "<br>"
-
-    conn = psycopg2.connect(
-        host=db_obj["endpoint"],
-        user=db_obj["masteruser"],
-        password=db_obj["mypass"],
-        port=db_obj["rdsport"])
-
+    conn = {}
+    try:
+        conn = psycopg2.connect(
+            host=db_obj["endpoint"],
+            user=db_obj["masteruser"],
+            password=db_obj["mypass"],
+            port=db_obj["rdsport"])
+    except psycopg2.OperationalError as e:
+        return {
+            "statusCode": 400,
+            "body": str(e),
+            "headers": {
+                'Content-Type': 'text/html',
+            }
+        }
     if (conn.status != 1):
         print("Not Running")
         return {
