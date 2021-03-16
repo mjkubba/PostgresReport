@@ -28,18 +28,18 @@ curl --location --request GET 'http://127.0.0.1:3000/' \
 ```
 OR
 ```
-http://127.0.0.1:3000/?endpoint=mydb.us-east-1.rds.amazonaws.com&rdsport=5432&masteruser=postgres&comname=aws&mypass=superstrongpassword
+http://127.0.0.1:3000/?endpoint=mydb.us-east-1.rds.amazonaws.com&rdsport=5432&masteruser=postgres&mypass=superstrongpassword
 ```
 ### Outputs:
 Create S3 Bucket with name (if not there): \<AccountID>-rdsreports   
-Save reports to that bucket after each run with name: \<datetime>-report.html
+Save reports to that bucket after each run with name: \<datetime>-\<rdsName>report.html
 
 ### Local testing:
 to start locally:    
 `sam local start-api`
 
 ### TODO:
-* Refactor functions
+* ~~Refactor functions~~
 * ~~Check for and create S3 buckets~~
 * ~~Implement secret retrieval~~
 * ~~limit the IAM to min required~~

@@ -154,16 +154,16 @@ def lambda_handler(event, context):
     #Idle Connections
     sql1="select count(*) from pg_stat_activity where state='idle';"
 
-      #Size of all databases
+    #Size of all databases
     sql2="""SELECT pg_database.datname,
     pg_database_size(pg_database.datname) as "DB_Size",
     pg_size_pretty(pg_database_size(pg_database.datname)) as "Pretty_DB_size"
     FROM pg_database ORDER by 2 DESC limit 5;"""
 
-      #Size only of all databases
+    #Size only of all databases
     sql3="SELECT pg_database_size(pg_database.datname)  FROM pg_database"
 
-      #Top 10 biggest tables
+    #Top 10 biggest tables
     sql4="""Select schemaname as table_schema,
        relname as table_name,
        pg_size_pretty(pg_total_relation_size(relid)) as "Total_Size",
@@ -175,7 +175,7 @@ def lambda_handler(event, context):
             pg_relation_size(relid) desc
     limit 10;"""
 
-      #Duplticate Indexes
+    #Duplticate Indexes
     sql5="""SELECT pg_size_pretty(SUM(pg_relation_size(idx))::BIGINT) AS SIZE,
          (array_agg(idx))[1] AS idx1, (array_agg(idx))[2] AS idx2,
          (array_agg(idx))[3] AS idx3, (array_agg(idx))[4] AS idx4
@@ -186,7 +186,7 @@ def lambda_handler(event, context):
     GROUP BY KEY HAVING COUNT(*)>1
     ORDER BY SUM(pg_relation_size(idx)) DESC;"""
 
-      #Unused Indexes
+    #Unused Indexes
     sql6="""SELECT s.schemaname,
          s.relname AS tablename,
          s.indexrelname AS indexname,
@@ -200,10 +200,10 @@ def lambda_handler(event, context):
             WHERE c.conindid = s.indexrelid)
     ORDER BY pg_relation_size(s.indexrelid) DESC limit 15;"""
 
-      #Database Age
+    #Database Age
     sql7="select datname, ltrim(to_char(age(datfrozenxid), '999,999,999,999,999')) age from pg_database where datname not like 'rdsadmin';"
 
-      #Most Bloated Tables
+    #Most Bloated Tables
     sql8="""SELECT
     current_database(), schemaname, tablename, /*reltuples::bigint, relpages::bigint, otta,*/
     ROUND((CASE WHEN otta=0 THEN 0.0 ELSE sml.relpages::FLOAT/otta END)::NUMERIC,1) AS tbloat,
@@ -250,20 +250,20 @@ def lambda_handler(event, context):
     ) AS sml
     ORDER BY wastedbytes DESC LIMIT 10;"""
 
-      #Top 10 biggest tables last vacuumed
+    #Top 10 biggest tables last vacuumed
     sql9="""SELECT
     schemaname, relname,last_vacuum, cast(last_autovacuum as date), cast(last_analyze as date), cast(last_autoanalyze as date),
     pg_size_pretty(pg_total_relation_size(table_name)) as table_total_size
     from pg_stat_user_tables a, information_schema.tables b where a.relname=b.table_name ORDER BY pg_total_relation_size(table_name) DESC limit 10;"""
 
-      #Memory Parameters
+    #Memory Parameters
     sql10="""select name, setting, source, context from pg_settings where name like '%mem%' or name ilike '%buff%'; """
 
-      #Performance Parameters
+    #Performance Parameters
     sql11="select name, setting from pg_settings where name IN ('shared_buffers', 'effective_cache_size', 'work_mem', 'maintenance_work_mem', 'default_statistics_target', 'random_page_cost', 'rds.logical_replication','wal_keep_segments');"
 
-      #pg_stat_statements top queries
-      #Top 10 short queries consuming CPU
+    #pg_stat_statements top queries
+    #Top 10 short queries consuming CPU
     sql12="""SELECT substring(query, 1, 50) AS short_query,
                 round(total_time::numeric, 2) AS total_time,
                 calls,
@@ -466,7 +466,7 @@ def lambda_handler(event, context):
     html = html + "<br>"
     html = html + "</td></tr></table></body></html>"
 
-    filename = "/tmp/" + datetime.datetime.now().strftime("%m-%d-%Y-T%H:%M:%S") + "-report.html"
+    filename = "/tmp/" + datetime.datetime.now().strftime("%m-%d-%Y-T%H:%M:%S") + rdsname + "-report.html"
     f = open(filename, "w")
     f.write(html)
     f.close()
@@ -479,7 +479,7 @@ def lambda_handler(event, context):
         'Rules': [{'ApplyServerSideEncryptionByDefault': {
                     'SSEAlgorithm': 'AES256',
                 }}]})
-    s3.meta.client.upload_file(filename, bucket_name, datetime.datetime.now().strftime("%m-%d-%Y-T%H:%M:%S") + "-report.html")
+    s3.meta.client.upload_file(filename, bucket_name, datetime.datetime.now().strftime("%m-%d-%Y-T%H:%M:%S") + rdsname + "-report.html")
 
     return {
         "statusCode": 200,
