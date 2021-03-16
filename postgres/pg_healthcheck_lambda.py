@@ -27,6 +27,8 @@ import subprocess
 import json
 import base64
 from botocore.exceptions import ClientError
+session = boto3.session.Session()
+aws_region = session.region_name
 
 subprocess.call('pip install psycopg2-binary -t /tmp/ --no-cache-dir'.split(),
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -56,7 +58,6 @@ def check_input(input_obj):
 
 def get_secret(secret_name):
     obj = {}
-    session = boto3.session.Session()
     client = session.client(service_name='secretsmanager')
 
     try:
@@ -152,9 +153,9 @@ def lambda_handler(event, context):
             }
         }
 
-    rdsclient = boto3.client('rds')
-    s3 = boto3.resource('s3')
-    s3client = boto3.client('s3')
+    rdsclient = boto3.client('rds', region_name=aws_region)
+    s3 = boto3.resource('s3', region_name=aws_region)
+    s3client = boto3.client('s3', region_name=aws_region)
     rdsname = db_obj["endpoint"].split(".")[0]
 
     # Idle Connections

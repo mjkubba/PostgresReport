@@ -47,7 +47,7 @@ to start locally:
 `sam local start-api`
 
 ### Using SAM to Deploy
-`sam deploy --stack-name <NEWSTACKNAME> --s3-bucket <EXISTINGS3BUCKET> --capabilities CAPABILITY_IAM`
+`sam deploy --stack-name <NEWSTACKNAME> --s3-bucket <EXISTINGS3BUCKET> --capabilities CAPABILITY_IAM --parameter-overrides securityGroup=sg-1234567890 subnets=subnet-1111111111111 --region <REGION>`
 
 ### TODO:
 * ~~Refactor functions~~
@@ -56,4 +56,4 @@ to start locally:
 * ~~limit the IAM to min required~~
 * Work with hanishg@ for test DBs
 * Make the html human readable!
-* Add other regions
+* ~~Add other regions~~

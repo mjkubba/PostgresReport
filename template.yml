@@ -1,5 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
+Parameters:
+  securityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
+  subnets:
+    Type: AWS::EC2::Subnet::Id
+
 Resources:
   rdsFunction:
     Type: AWS::Serverless::Function
@@ -57,7 +63,6 @@ Resources:
           Resource: '*'
       VpcConfig:
         SecurityGroupIds:
-          - sg-0765ba559515af3f8
+          - !Ref securityGroup
         SubnetIds:
-          - subnet-0a34d3dc411a020c9
-          - subnet-0e0d5777a50dd7e2e
+          - !Ref subnets
