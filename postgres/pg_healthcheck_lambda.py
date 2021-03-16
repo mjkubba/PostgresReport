@@ -25,6 +25,8 @@ import boto3
 import os
 import subprocess
 import json
+import base64
+from botocore.exceptions import ClientError
 
 subprocess.call('pip install psycopg2-binary -t /tmp/ --no-cache-dir'.split(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 sys.path.insert(1, '/tmp/')
@@ -37,17 +39,11 @@ def check_input(input_obj):
         if "endpoint" not in input_obj:
             print("missing endpoint")
             return(False)
-        elif "dbname" not in input_obj:
-            print("missing dbname")
-            return(False)
         elif "rdsport" not in input_obj:
             print("missing rdsport")
             return(False)
         elif "masteruser" not in input_obj:
             print("missing masteruser")
-            return(False)
-        elif "comname" not in input_obj:
-            print("missing comname")
             return(False)
         elif "mypass" not in input_obj:
             print("missing mypass")
@@ -65,7 +61,8 @@ def get_secret(secret_name):
             SecretId=secret_name
         )
     except ClientError as e:
-        raise e
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            return("Secret Not Found: " + secret_name, False)
     else:
         if 'SecretString' in get_secret_value_response:
             tmp_obj = json.loads(get_secret_value_response['SecretString'])
@@ -74,7 +71,7 @@ def get_secret(secret_name):
             obj["mypass"] = tmp_obj["password"]
             obj["masteruser"] = tmp_obj["username"]
             obj["rdsport"] = tmp_obj["port"]
-            return obj
+            return(False, obj)
 
         else:
             tmp_obj = json.loads(base64.b64decode(get_secret_value_response['SecretBinary']))
@@ -82,7 +79,7 @@ def get_secret(secret_name):
             obj["mypass"] = tmp_obj["password"]
             obj["masteruser"] = tmp_obj["username"]
             obj["rdsport"] = tmp_obj["port"]
-            return obj
+            return(False, obj)
 
 
 def table_creator(top, headers, cur, sql):
@@ -109,28 +106,38 @@ def table_creator(top, headers, cur, sql):
 
 def get_obj(event):
     obj = []
-    if event["body"]:
+    if "body" in event and event["body"]:
         event = json.loads(event["body"])
         if "secret" in event:
-            return(get_secret(event["secret"]))
+            err_check, db_obj = get_secret(event["secret"])
+            return(err_check, db_obj)
         else:
-            return(event)
-    elif event["queryStringParameters"]:
+            return(False, event)
+    elif "queryStringParameters" in event and event["queryStringParameters"]:
         if "secret" in event["queryStringParameters"]:
-            return(get_secret(event["queryStringParameters"]["secret"]))
+            err_check, db_obj = get_secret(event["queryStringParameters"]["secret"])
+            return(err_check, db_obj)
         else:
-            return(event["queryStringParameters"])
+            return(False, event["queryStringParameters"])
 
 
 def lambda_handler(event, context):
-    if event["body"]:
+    if "body" in event and event["body"]:
         input_validator=check_input(json.loads(event["body"]))
-        db_obj = get_obj(event)
-    elif event["queryStringParameters"]:
+        err_check, db_obj = get_obj(event)
+    elif "queryStringParameters" in event and event["queryStringParameters"]:
         input_validator=check_input(event["queryStringParameters"])
-        db_obj = get_obj(event)
+        err_check, db_obj = get_obj(event)
     else:
         input_validator=False
+    if err_check:
+        return {
+            "statusCode": 400,
+            "body": err_check,
+            "headers": {
+                'Content-Type': 'text/html',
+            }
+        }
     if not input_validator:
         return {
             "statusCode": 400,

@@ -43,6 +43,11 @@ Resources:
           Action:
           - sts:getCallerIdentity
           Resource: '*'
+        - Sid: smPol
+          Effect: Allow
+          Action:
+          - secretsmanager:GetSecretValue
+          Resource: '*'
       VpcConfig:
         SecurityGroupIds:
           - sg-0765ba559515af3f8
