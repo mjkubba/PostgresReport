@@ -5,7 +5,7 @@ Generates HTML file \<date>-report.html
 ### Inputs
 Required input:   
 EITHER (preferred):    
-* secret
+* sid
 
 OR (not recommended):   
 * endpoint
@@ -13,10 +13,16 @@ OR (not recommended):
 * mypass
 * rdsport
 
-if you pass in "secret" the lambda will retrieve the required details from AWS Secrets Manager based on the SecretID  provided
+if you pass in "sid" the lambda will retrieve the required details from AWS Secrets Manager based on the SecretID  provided
 
 You can either pass the required input by API body or query parameters:
 ```
+curl --location --request GET 'http://127.0.0.1:3000/' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "sid": "demo-postgres"
+  }'
+
 curl --location --request GET 'http://127.0.0.1:3000/' \
 --header 'Content-Type: application/json' \
 --data-raw '{
@@ -28,6 +34,8 @@ curl --location --request GET 'http://127.0.0.1:3000/' \
 ```
 OR
 ```
+http://127.0.0.1:3000/?sid=demo-postgres
+
 http://127.0.0.1:3000/?endpoint=mydb.us-east-1.rds.amazonaws.com&rdsport=5432&masteruser=postgres&mypass=superstrongpassword
 ```
 ### Outputs:
@@ -37,6 +45,9 @@ Save reports to that bucket after each run with name: \<datetime>-\<rdsName>repo
 ### Local testing:
 to start locally:    
 `sam local start-api`
+
+### Using SAM to Deploy
+`sam deploy --stack-name <NEWSTACKNAME> --s3-bucket <EXISTINGS3BUCKET> --capabilities CAPABILITY_IAM`
 
 ### TODO:
 * ~~Refactor functions~~

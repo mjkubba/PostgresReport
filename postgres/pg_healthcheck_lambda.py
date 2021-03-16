@@ -35,7 +35,7 @@ import psycopg2
 
 
 def check_input(input_obj):
-    if "secret" in input_obj:
+    if "sid" in input_obj:
         return(True)
     else:
         if "endpoint" not in input_obj:
@@ -112,15 +112,15 @@ def get_obj(event):
     obj = []
     if "body" in event and event["body"]:
         event = json.loads(event["body"])
-        if "secret" in event:
-            err_check, db_obj = get_secret(event["secret"])
+        if "sid" in event:
+            err_check, db_obj = get_secret(event["sid"])
             return(err_check, db_obj)
         else:
             return(False, event)
     elif "queryStringParameters" in event and event["queryStringParameters"]:
-        if "secret" in event["queryStringParameters"]:
+        if "sid" in event["queryStringParameters"]:
             err_check, db_obj = get_secret(event["queryStringParameters"]
-                                                ["secret"])
+                                                ["sid"])
             return(err_check, db_obj)
         else:
             return(False, event["queryStringParameters"])
