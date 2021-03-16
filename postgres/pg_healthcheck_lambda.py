@@ -451,7 +451,7 @@ def lambda_handler(event, context):
 
     html = html + table_creator("Database Age: ", ["datname", "age"], cur, sql7)
 
-    html = html + table_creator("Top 10 Most Bloated Tables: ", ["current_database", "schemaname", "tbloat", "wastedbytes", "iname", "ibloat", "wastedibytes"], cur, sql8)
+    html = html + table_creator("Top 10 Most Bloated Tables: ", ["current_database", "schemaname", "tablename", "tbloat", "wastedbytes", "iname", "ibloat", "wastedibytes"], cur, sql8)
 
     html = html + table_creator("Top 10 Biggest Tables Last Vacuumed: ", ["schemaname", "relname", "last_vacuum", "date", "date", "date", "table_total_size"], cur, sql9)
 
@@ -466,7 +466,7 @@ def lambda_handler(event, context):
     html = html + table_creator("Performance Parameters: ", ["name", "setting"], cur, sql11)
 
     cur.execute("select * FROM pg_extension")
-    if "pg_stat_statements" in cur.fetchone():
+    if "pg_stat_statements" in cur.fetchall():
         html = html + table_creator("Top 10 CPU Consuming SQLs: ", ["short_query", "total_time", "calls", "mean", "percentage_cpu"], cur, sql12)
         html = html + table_creator("Top 10 Read Queries: ", ["short_query", "total_time", "calls", "shared_blks_read", "shared_blks_hit", "hit_percent"], cur, sql13)
         html = html + table_creator("Top 10 Write Queries: ", ["short_query", "total_time", "calls", "rows", "volume"], cur, sql14)
@@ -490,10 +490,13 @@ def lambda_handler(event, context):
     s3client.create_bucket(Bucket=bucket_name, ACL='private')
     s3client.put_bucket_encryption(Bucket=bucket_name,
                                    ServerSideEncryptionConfiguration={
-                                    'Rules': [{'ApplyServerSideEncryptionByDefault': {
-                                                'SSEAlgorithm': 'AES256',
-                                            }}]})
-    s3.meta.client.upload_file(filename, bucket_name, datetime.datetime.now().strftime("%m-%d-%Y-T%H:%M:%S") + rdsname + "-report.html")
+                                    'Rules': [{
+                                        'ApplyServerSideEncryptionByDefault': {
+                                                'SSEAlgorithm': 'AES256', }}]})
+    s3.meta.client.upload_file(filename, bucket_name,
+                               datetime.datetime.now()
+                               .strftime("%m-%d-%Y-T%H:%M:%S") + rdsname
+                               + "-report.html")
 
     return {
         "statusCode": 200,
