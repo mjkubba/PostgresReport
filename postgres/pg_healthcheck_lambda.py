@@ -533,4 +533,4 @@ def lambda_handler(event, context):
         }
     }
 
-#  pylama:ignore=E501
+#  pylama:ignore=E501,C901
