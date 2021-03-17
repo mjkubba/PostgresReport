@@ -53,7 +53,7 @@ def check_input(input_obj):
 def get_secret(secret_name):
     """Get secret from secret managerand return database object."""
     obj = {}
-    client = session.client(service_name='secretsmanager')
+    client = session.client(service_name='secretsmanager', region_name=aws_region)
 
     try:
         get_secret_value_response = client.get_secret_value(
