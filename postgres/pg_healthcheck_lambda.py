@@ -54,7 +54,6 @@ def get_secret(secret_name):
     """Get secret from secret managerand return database object."""
     obj = {}
     client = session.client(service_name='secretsmanager', region_name=aws_region)
-
     try:
         get_secret_value_response = client.get_secret_value(
             SecretId=secret_name
@@ -69,7 +68,6 @@ def get_secret(secret_name):
             obj["mypass"] = tmp_obj["password"]
             obj["masteruser"] = tmp_obj["username"]
             obj["rdsport"] = tmp_obj["port"]
-            obj["dbname"] = tmp_obj["dbname"]
             if "dbClusterIdentifier" in tmp_obj:
                 obj["id"] = tmp_obj["dbClusterIdentifier"]
                 obj["type"] = "aurora"
@@ -86,7 +84,6 @@ def get_secret(secret_name):
             obj["mypass"] = tmp_obj["password"]
             obj["masteruser"] = tmp_obj["username"]
             obj["rdsport"] = tmp_obj["port"]
-            obj["dbname"] = tmp_obj["dbname"]
             if "dbClusterIdentifier" in tmp_obj:
                 obj["id"] = tmp_obj["dbClusterIdentifier"]
                 obj["type"] = "aurora"
@@ -515,11 +512,16 @@ def lambda_handler(event, context):
     if bucket.creation_date:
         print("The bucket exists")
     else:
-        s3client.create_bucket(Bucket=bucket_name, ACL='private', CreateBucketConfiguration={"LocationConstraint": aws_region})
+        if aws_region == "us-east-1":
+            s3client.create_bucket(Bucket=bucket_name, ACL='private',)
+        else:
+            location = {"LocationConstraint": aws_region}
+            s3client.create_bucket(
+                    Bucket=bucket_name,
+                    CreateBucketConfiguration=location
+            )
         s3client.put_bucket_encryption(Bucket=bucket_name,
-                                       ServerSideEncryptionConfiguration={
-                                        'Rules': [{'ApplyServerSideEncryptionByDefault': {
-                                                    'SSEAlgorithm': 'AES256', }}]})
+                                       ServerSideEncryptionConfiguration={'Rules': [{'ApplyServerSideEncryptionByDefault': {'SSEAlgorithm': 'AES256', }}]})
     s3.meta.client.upload_file(filename, bucket_name,
                                datetime.datetime.now()
                                .strftime("%m-%d-%Y-T%H:%M:%S") + rdsname
