@@ -172,6 +172,13 @@ def lambda_handler(event, context):
     s3client = boto3.client('s3', region_name=aws_region)
     rdsname = db_obj["endpoint"].split(".")[0]
 
+    if db_obj["type"] == "rds":
+        rds_details = rdsclient.describe_db_instances(DBInstanceIdentifier=db_obj["id"])
+    elif db_obj["type"] == "aurora":
+        rds_cluster = rdsclient.describe_db_clusters(DBClusterIdentifier=db_obj["id"])
+        db_obj["dbinstance"] = rds_cluster["DBClusters"][0]["DBClusterMembers"][0]["DBInstanceIdentifier"]
+        rds_details = rdsclient.describe_db_instances(DBInstanceIdentifier=db_obj["dbinstance"])
+
     # Idle Connections
     sql1 = "select count(*) from pg_stat_activity where state='idle';"
 
@@ -363,6 +370,8 @@ def lambda_handler(event, context):
     html = html + "<br>"
     html = html + """<font face="verdana" color="#ff6600">Instance Details:  </font>"""
     html = html + "<br>"
+    html = html + "Postgres Instance Name: " + rds_details["DBInstances"][0]["DBInstanceIdentifier"]
+    html = html + "<br>"
     html = html + "Postgres Endpoint URL:" + db_obj["endpoint"]
     html = html + "<br>"
     conn = {}
@@ -408,7 +417,6 @@ def lambda_handler(event, context):
         }
 
     cur = conn.cursor()
-    html = html + "Connected to: " + db_obj["dbname"]
     html = html + "Postgres Engine Version: "
     cur.execute("SELECT version()")
     html = html + cur.fetchone()[0] + newline
@@ -430,12 +438,6 @@ def lambda_handler(event, context):
     html = html + """<font face="verdana" color="#ff6600">Instance Configuration: </font>"""
     html = html + "<br>"
     html = html + "Publicly Accessible: "
-    if db_obj["type"] == "rds":
-        rds_details = rdsclient.describe_db_instances(DBInstanceIdentifier=db_obj["id"])
-    elif db_obj["type"] == "aurora":
-        rds_cluster = rdsclient.describe_db_clusters(DBClusterIdentifier=db_obj["id"])
-        db_obj["dbinstance"] = rds_cluster["DBClusters"][0]["DBClusterMembers"][0]["DBInstanceIdentifier"]
-        rds_details = rdsclient.describe_db_instances(DBInstanceIdentifier=db_obj["dbinstance"])
     html = html + str(rds_details["DBInstances"][0]["PubliclyAccessible"])
     html = html + "<br>"
     html = html + "EM Monitoring Interval: "
