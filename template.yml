@@ -49,6 +49,7 @@ Resources:
           Effect: Allow
           Action:
           - rds:DescribeDBInstances
+          - rds:DescribeDBClusters
           - rds:DescribeDBLogFiles
           Resource: '*'
         - Sid: stsPol
