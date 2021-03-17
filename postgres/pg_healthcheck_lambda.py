@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-
+"""Generate postgres report based on the provided input."""
 # pg_health_check.py
 # Author: MJ Kubba <mjkubba@amazon.com>
 # based on work of Vivek Singh
@@ -21,9 +20,7 @@
 # THE SOFTWARE.
 
 import datetime
-import sys
 import boto3
-import subprocess
 import json
 import base64
 from botocore.exceptions import ClientError
@@ -33,6 +30,7 @@ aws_region = session.region_name
 
 
 def check_input(input_obj):
+    """Check for inputs and create Object."""
     if "sid" in input_obj:
         return(True)
     else:
@@ -53,6 +51,7 @@ def check_input(input_obj):
 
 
 def get_secret(secret_name):
+    """Get secret from secret managerand return database object."""
     obj = {}
     client = session.client(service_name='secretsmanager')
 
@@ -98,6 +97,7 @@ def get_secret(secret_name):
 
 
 def table_creator(top, headers, cur, sql):
+    """Create html table around the database return."""
     html = """<font face="verdana" color="#ff6600"> """ + top + """ </font>"""
     html = html + "<br>"
     html = html + """<table border="1"><tr>"""
@@ -121,7 +121,7 @@ def table_creator(top, headers, cur, sql):
 
 
 def get_obj(event):
-    obj = []
+    """Get the event object."""
     if "body" in event and event["body"]:
         event = json.loads(event["body"])
         if "sid" in event:
@@ -139,6 +139,7 @@ def get_obj(event):
 
 
 def lambda_handler(event, context):
+    """Handle the lambda event."""
     err_check = False
     if "body" in event and event["body"]:
         input_validator = check_input(json.loads(event["body"]))
@@ -220,7 +221,9 @@ def lambda_handler(event, context):
     ORDER BY pg_relation_size(s.indexrelid) DESC limit 15;"""
 
     # Database Age
-    sql7 = "select datname, ltrim(to_char(age(datfrozenxid), '999,999,999,999,999')) age from pg_database where datname not like 'rdsadmin';"
+    sql7 = """select datname,
+           ltrim(to_char(age(datfrozenxid), '999,999,999,999,999')) age
+           from pg_database where datname not like 'rdsadmin';"""
 
     # Most Bloated Tables
     sql8 = """SELECT
@@ -352,14 +355,14 @@ def lambda_handler(event, context):
     html = html + """<body style="font-family:'Verdana'" bgcolor="#F8F8F8">"""
     html = html + """<fieldset>"""
     html = html + """<table><tr> <td width="20"></td> <td>"""
-    html = html + """<h1><font face="verdana" color="#0099cc"><center><u>PostgreSQL Health Report For """+ rdsname +"""</u></center></font></h1>"""
-    html = html + """<h3><font face="verdana">"""+ datetime.datetime.now().strftime("%c") +"""</h3></color>"""
+    html = html + """<h1><font face="verdana" color="#0099cc"><center><u>PostgreSQL Health Report For """ + rdsname + """</u></center></font></h1>"""
+    html = html + """<h3><font face="verdana">""" + datetime.datetime.now().strftime("%c") + """</h3></color>"""
     html = html + """</fieldset>"""
 
     html = html + "<br>"
     html = html + """<font face="verdana" color="#ff6600">Instance Details:  </font>"""
     html = html + "<br>"
-    html = html + "Postgres Endpoint URL:"+ db_obj["endpoint"]
+    html = html + "Postgres Endpoint URL:" + db_obj["endpoint"]
     html = html + "<br>"
     conn = {}
     try:
@@ -440,7 +443,7 @@ def lambda_handler(event, context):
         rds_log_details = rdsclient.describe_db_log_files(DBInstanceIdentifier=db_obj["id"])
     elif db_obj["type"] == "aurora":
         rds_log_details = rdsclient.describe_db_log_files(DBInstanceIdentifier=db_obj["dbinstance"])
-    AGB = 1073741824
+
     total_log_size = 0
     for log in rds_log_details["DescribeDBLogFiles"]:
         total_log_size = total_log_size + log["Size"]
@@ -510,9 +513,9 @@ def lambda_handler(event, context):
     bucket_name = "rds-reports-"+accountID
     bucket = s3.Bucket(bucket_name)
     if bucket.creation_date:
-       print("The bucket exists")
+        print("The bucket exists")
     else:
-        s3client.create_bucket(Bucket=bucket_name, ACL='private', CreateBucketConfiguration={"LocationConstraint":aws_region})
+        s3client.create_bucket(Bucket=bucket_name, ACL='private', CreateBucketConfiguration={"LocationConstraint": aws_region})
         s3client.put_bucket_encryption(Bucket=bucket_name,
                                        ServerSideEncryptionConfiguration={
                                         'Rules': [{'ApplyServerSideEncryptionByDefault': {
@@ -529,3 +532,5 @@ def lambda_handler(event, context):
             'Content-Type': 'text/html',
         }
     }
+
+#  pylama:ignore=E501
