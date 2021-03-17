@@ -68,6 +68,8 @@ def get_secret(secret_name):
             obj["mypass"] = tmp_obj["password"]
             obj["masteruser"] = tmp_obj["username"]
             obj["rdsport"] = tmp_obj["port"]
+            if "dbname" in tmp_obj:
+                obj["dbname"] = tmp_obj["dbname"]
             if "dbClusterIdentifier" in tmp_obj:
                 obj["id"] = tmp_obj["dbClusterIdentifier"]
                 obj["type"] = "aurora"
@@ -84,6 +86,8 @@ def get_secret(secret_name):
             obj["mypass"] = tmp_obj["password"]
             obj["masteruser"] = tmp_obj["username"]
             obj["rdsport"] = tmp_obj["port"]
+            if "dbname" in tmp_obj:
+                obj["dbname"] = tmp_obj["dbname"]
             if "dbClusterIdentifier" in tmp_obj:
                 obj["id"] = tmp_obj["dbClusterIdentifier"]
                 obj["type"] = "aurora"
@@ -362,20 +366,37 @@ def lambda_handler(event, context):
     html = html + "Postgres Endpoint URL:" + db_obj["endpoint"]
     html = html + "<br>"
     conn = {}
-    try:
-        conn = psycopg2.connect(
-            host=db_obj["endpoint"],
-            user=db_obj["masteruser"],
-            password=db_obj["mypass"],
-            port=db_obj["rdsport"])
-    except psycopg2.OperationalError as e:
-        return {
-            "statusCode": 400,
-            "body": str(e),
-            "headers": {
-                'Content-Type': 'text/html',
+    if "dbname" in db_obj:
+        try:
+            conn = psycopg2.connect(
+                host=db_obj["endpoint"],
+                user=db_obj["masteruser"],
+                password=db_obj["mypass"],
+                dbname=db_obj["dbname"],
+                port=db_obj["rdsport"])
+        except psycopg2.OperationalError as e:
+            return {
+                "statusCode": 400,
+                "body": str(e),
+                "headers": {
+                    'Content-Type': 'text/html',
+                }
             }
-        }
+    else:
+        try:
+            conn = psycopg2.connect(
+                host=db_obj["endpoint"],
+                user=db_obj["masteruser"],
+                password=db_obj["mypass"],
+                port=db_obj["rdsport"])
+        except psycopg2.OperationalError as e:
+            return {
+                "statusCode": 400,
+                "body": str(e),
+                "headers": {
+                    'Content-Type': 'text/html',
+                }
+            }
     if (conn.status != 1):
         print("Not Running")
         return {
