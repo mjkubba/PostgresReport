@@ -27,13 +27,9 @@ import subprocess
 import json
 import base64
 from botocore.exceptions import ClientError
+import psycopg2
 session = boto3.session.Session()
 aws_region = session.region_name
-
-subprocess.call('pip install psycopg2-binary -t /tmp/ --no-cache-dir'.split(),
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-sys.path.insert(1, '/tmp/')
-import psycopg2
 
 
 def check_input(input_obj):
@@ -143,6 +139,7 @@ def get_obj(event):
 
 
 def lambda_handler(event, context):
+    err_check = False
     if "body" in event and event["body"]:
         input_validator = check_input(json.loads(event["body"]))
         err_check, db_obj = get_obj(event)
