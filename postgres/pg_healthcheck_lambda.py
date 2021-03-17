@@ -408,6 +408,7 @@ def lambda_handler(event, context):
         }
 
     cur = conn.cursor()
+    html = html + "Connected to: " + db_obj["dbname"]
     html = html + "Postgres Engine Version: "
     cur.execute("SELECT version()")
     html = html + cur.fetchone()[0] + newline
@@ -529,20 +530,20 @@ def lambda_handler(event, context):
 
     accountID = boto3.client('sts').get_caller_identity().get('Account')
     bucket_name = "rds-reports-"+accountID
-    bucket = s3.Bucket(bucket_name)
-    if bucket.creation_date:
-        print("The bucket exists")
-    else:
+    try:
+        s3.meta.client.head_bucket(Bucket=bucket_name)
+        print("Bucket Exists")
+    except ClientError as e:
+        print("Bucket Does Not Exist!")
         if aws_region == "us-east-1":
             s3client.create_bucket(Bucket=bucket_name, ACL='private',)
         else:
             location = {"LocationConstraint": aws_region}
             s3client.create_bucket(
-                    Bucket=bucket_name,
-                    CreateBucketConfiguration=location
+                Bucket=bucket_name,
+                CreateBucketConfiguration=location
             )
-        s3client.put_bucket_encryption(Bucket=bucket_name,
-                                       ServerSideEncryptionConfiguration={'Rules': [{'ApplyServerSideEncryptionByDefault': {'SSEAlgorithm': 'AES256', }}]})
+            s3client.put_bucket_encryption(Bucket=bucket_name, ServerSideEncryptionConfiguration={'Rules': [{'ApplyServerSideEncryptionByDefault': {'SSEAlgorithm': 'AES256', }}]})
     s3.meta.client.upload_file(filename, bucket_name,
                                datetime.datetime.now()
                                .strftime("%m-%d-%Y-T%H:%M:%S") + rdsname
