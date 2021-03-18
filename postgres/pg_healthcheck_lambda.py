@@ -97,8 +97,9 @@ def get_secret(secret_name):
             return(False, obj)
 
 
-def table_creator(top, headers, cur, sql):
+def table_creator(top, headers, cur, sqlname):
     """Create html table around the database return."""
+    sql = open('sql/' + sqlname + '.sql', 'r').read().lstrip().replace('\n', '')
     html = """<font face="verdana" color="#ff6600"> """ + top + """ </font>"""
     html = html + "<br>"
     html = html + """<table border="1"><tr>"""
@@ -139,6 +140,41 @@ def get_obj(event):
             return(False, event["queryStringParameters"])
 
 
+def s3_create_upload(filename):
+    """Create and upload html to S3 bucket."""
+    s3 = boto3.resource('s3', region_name=aws_region)
+    s3client = boto3.client('s3', region_name=aws_region)
+    accountID = boto3.client('sts').get_caller_identity().get('Account')
+    bucket_name = "rds-reports-"+accountID
+    bucket_exist = True
+    try:
+        s3.meta.client.head_bucket(Bucket=bucket_name)
+        print("Bucket Exists")
+    except ClientError as e:
+        if int(e.response['Error']['Code']) == 403:
+            print("Private Bucket. Forbidden Access!")
+            pass
+        else:
+            print("Bucket Does Not Exist!")
+            print(str(e))
+            bucket_exist = False
+            pass
+    if not bucket_exist:
+        if aws_region == "us-east-1":
+            s3client.create_bucket(Bucket=bucket_name, ACL='private')
+        else:
+            location = {"LocationConstraint": aws_region}
+            s3client.create_bucket(
+                Bucket=bucket_name,
+                ACL='private',
+                CreateBucketConfiguration=location
+            )
+            s3client.put_bucket_encryption(Bucket=bucket_name, ServerSideEncryptionConfiguration={'Rules': [{'ApplyServerSideEncryptionByDefault': {'SSEAlgorithm': 'AES256', }}]})
+
+    s3.meta.client.upload_file(filename, bucket_name,
+                               filename.split("tmp/")[1])
+
+
 def lambda_handler(event, context):
     """Handle the lambda event."""
     err_check = False
@@ -168,8 +204,6 @@ def lambda_handler(event, context):
         }
 
     rdsclient = boto3.client('rds', region_name=aws_region)
-    s3 = boto3.resource('s3', region_name=aws_region)
-    s3client = boto3.client('s3', region_name=aws_region)
     rdsname = db_obj["endpoint"].split(".")[0]
 
     if db_obj["type"] == "rds":
@@ -178,182 +212,6 @@ def lambda_handler(event, context):
         rds_cluster = rdsclient.describe_db_clusters(DBClusterIdentifier=db_obj["id"])
         db_obj["dbinstance"] = rds_cluster["DBClusters"][0]["DBClusterMembers"][0]["DBInstanceIdentifier"]
         rds_details = rdsclient.describe_db_instances(DBInstanceIdentifier=db_obj["dbinstance"])
-
-    # Idle Connections
-    sql1 = "select count(*) from pg_stat_activity where state='idle';"
-
-    # Size of all databases
-    sql2 = """SELECT pg_database.datname,
-    pg_database_size(pg_database.datname) as "DB_Size",
-    pg_size_pretty(pg_database_size(pg_database.datname)) as "Pretty_DB_size"
-    FROM pg_database ORDER by 2 DESC limit 5;"""
-
-    # Size only of all databases
-    sql3 = "SELECT pg_database_size(pg_database.datname)  FROM pg_database"
-
-    # Top 10 biggest tables
-    sql4 = """Select schemaname as table_schema,
-       relname as table_name,
-       pg_size_pretty(pg_total_relation_size(relid)) as "Total_Size",
-       pg_size_pretty(pg_relation_size(relid)) as "Data_Size",
-       pg_size_pretty(pg_total_relation_size(relid) - pg_relation_size(relid))
-         as "Index_Size"
-    from pg_catalog.pg_statio_user_tables
-    order by pg_total_relation_size(relid) desc,
-            pg_relation_size(relid) desc
-    limit 10;"""
-
-    # Duplticate Indexes
-    sql5 = """SELECT pg_size_pretty(SUM(pg_relation_size(idx))::BIGINT) AS SIZE,
-         (array_agg(idx))[1] AS idx1, (array_agg(idx))[2] AS idx2,
-         (array_agg(idx))[3] AS idx3, (array_agg(idx))[4] AS idx4
-    FROM (
-      SELECT indexrelid::regclass AS idx, (indrelid::text ||E'\n'|| indclass::text ||E'\n'|| indkey::text ||E'\n'||
-                                           COALESCE(indexprs::text,'')||E'\n' || COALESCE(indpred::text,'')) AS KEY
-      FROM pg_index) sub
-    GROUP BY KEY HAVING COUNT(*)>1
-    ORDER BY SUM(pg_relation_size(idx)) DESC;"""
-
-    # Unused Indexes
-    sql6 = """SELECT s.schemaname,
-         s.relname AS tablename,
-         s.indexrelname AS indexname,
-         pg_size_pretty(pg_relation_size(s.indexrelid)) AS index_size
-    FROM pg_catalog.pg_stat_user_indexes s
-     JOIN pg_catalog.pg_index i ON s.indexrelid = i.indexrelid
-    WHERE s.idx_scan = 0      -- has never been scanned
-    AND 0 <>ALL (i.indkey)  -- no index column is an expression
-    AND NOT EXISTS          -- does not enforce a constraint
-           (SELECT 1 FROM pg_catalog.pg_constraint c
-            WHERE c.conindid = s.indexrelid)
-    ORDER BY pg_relation_size(s.indexrelid) DESC limit 15;"""
-
-    # Database Age
-    sql7 = """select datname,
-           ltrim(to_char(age(datfrozenxid), '999,999,999,999,999')) age
-           from pg_database where datname not like 'rdsadmin';"""
-
-    # Most Bloated Tables
-    sql8 = """SELECT
-    current_database(), schemaname, tablename, /*reltuples::bigint, relpages::bigint, otta,*/
-    ROUND((CASE WHEN otta=0 THEN 0.0 ELSE sml.relpages::FLOAT/otta END)::NUMERIC,1) AS tbloat,
-    CASE WHEN relpages < otta THEN 0 ELSE bs*(sml.relpages-otta)::BIGINT END AS wastedbytes,
-    iname, /*ituples::bigint, ipages::bigint, iotta,*/
-    ROUND((CASE WHEN iotta=0 OR ipages=0 THEN 0.0 ELSE ipages::FLOAT/iotta END)::NUMERIC,1) AS ibloat,
-    CASE WHEN ipages < iotta THEN 0 ELSE bs*(ipages-iotta) END AS wastedibytes
-    FROM (
-    SELECT
-      schemaname, tablename, cc.reltuples, cc.relpages, bs,
-      CEIL((cc.reltuples*((datahdr+ma-
-        (CASE WHEN datahdr%ma=0 THEN ma ELSE datahdr%ma END))+nullhdr2+4))/(bs-20::FLOAT)) AS otta,
-      COALESCE(c2.relname,'?') AS iname, COALESCE(c2.reltuples,0) AS ituples, COALESCE(c2.relpages,0) AS ipages,
-      COALESCE(CEIL((c2.reltuples*(datahdr-12))/(bs-20::FLOAT)),0) AS iotta -- very rough approximation, assumes all cols
-    FROM (
-      SELECT
-        ma,bs,schemaname,tablename,
-        (datawidth+(hdr+ma-(CASE WHEN hdr%ma=0 THEN ma ELSE hdr%ma END)))::NUMERIC AS datahdr,
-        (maxfracsum*(nullhdr+ma-(CASE WHEN nullhdr%ma=0 THEN ma ELSE nullhdr%ma END))) AS nullhdr2
-      FROM (
-        SELECT
-          schemaname, tablename, hdr, ma, bs,
-          SUM((1-null_frac)*avg_width) AS datawidth,
-          MAX(null_frac) AS maxfracsum,
-          hdr+(
-            SELECT 1+COUNT(*)/8
-            FROM pg_stats s2
-            WHERE null_frac<>0 AND s2.schemaname = s.schemaname AND s2.tablename = s.tablename
-          ) AS nullhdr
-        FROM pg_stats s, (
-          SELECT
-            (SELECT current_setting('block_size')::NUMERIC) AS bs,
-            CASE WHEN SUBSTRING(v,12,3) IN ('8.0','8.1','8.2') THEN 27 ELSE 23 END AS hdr,
-            CASE WHEN v ~ 'mingw32' THEN 8 ELSE 4 END AS ma
-          FROM (SELECT version() AS v) AS foo
-        ) AS constants
-        GROUP BY 1,2,3,4,5
-      ) AS foo
-    ) AS rs
-    JOIN pg_class cc ON cc.relname = rs.tablename
-    JOIN pg_namespace nn ON cc.relnamespace = nn.oid AND nn.nspname = rs.schemaname AND nn.nspname <> 'information_schema'
-    LEFT JOIN pg_index i ON indrelid = cc.oid
-    LEFT JOIN pg_class c2 ON c2.oid = i.indexrelid
-    ) AS sml
-    ORDER BY wastedbytes DESC LIMIT 10;"""
-
-    # Top 10 biggest tables last vacuumed
-    sql9 = """SELECT
-    schemaname, relname,last_vacuum, cast(last_autovacuum as date), cast(last_analyze as date), cast(last_autoanalyze as date),
-    pg_size_pretty(pg_total_relation_size(table_name)) as table_total_size
-    from pg_stat_user_tables a, information_schema.tables b where a.relname=b.table_name ORDER BY pg_total_relation_size(table_name) DESC limit 10;"""
-
-    # Memory Parameters
-    sql10 = """select name, setting, source, context from pg_settings where name like '%mem%' or name ilike '%buff%'; """
-
-    # Performance Parameters
-    sql11 = "select name, setting from pg_settings where name IN ('shared_buffers', 'effective_cache_size', 'work_mem', 'maintenance_work_mem', 'default_statistics_target', 'random_page_cost', 'rds.logical_replication','wal_keep_segments');"
-
-    # pg_stat_statements top queries
-    # Top 10 short queries consuming CPU
-    sql12 = """SELECT substring(query, 1, 50) AS short_query,
-                round(total_time::numeric, 2) AS total_time,
-                calls,
-                round(mean_time::numeric, 2) AS mean,
-                round((100 * total_time /
-                sum(total_time::numeric) OVER ())::numeric, 2) AS percentage_cpu
-    FROM    pg_stat_statements
-    ORDER BY total_time DESC
-    LIMIT 10;"""
-
-    # Top 10 short queries causing high Read IOPS
-    sql13 = """SELECT
-    left(query, 50) AS short_query
-    ,round(total_time::numeric, 2) AS total_time
-    ,calls
-    ,shared_blks_read
-    ,shared_blks_hit
-    ,round((100.0 * shared_blks_hit/nullif(shared_blks_hit + shared_blks_read, 0))::numeric,2) AS hit_percent
-    FROM  pg_stat_statements
-    ORDER BY total_time DESC LIMIT 10;"""
-
-    # Top 10 short queries causing high write IOPS
-    sql14 = """SELECT
-      left(query, 50) AS short_query
-     ,round(total_time::numeric, 2) AS total_time
-     ,calls
-     ,rows
-     ,calls*total_time*rows as Volume
-     FROM pg_stat_statements
-    WHERE
-      (query ilike '%update%'
-      or query ilike '%insert%'
-      or query ilike '%delete%')
-      and query not like '%aurora_replica_status%'
-      and query not like '%rds_heartbeat%'
-    ORDER BY Volume DESC LIMIT 10;"""
-
-    # Top 10 UPDATE/DELETE tables
-    sql15 = """SELECT relname
-    ,round(upd_percent::numeric, 2) AS update_percent
-    ,round(del_percent::numeric, 2) AS delete_percent
-    ,round(ins_percent::numeric, 2) AS insert_percent
-    from (
-    SELECT relname
-    ,100*cast(n_tup_upd AS numeric) / (n_tup_ins + n_tup_upd + n_tup_del) AS upd_percent
-    ,100*cast(n_tup_del AS numeric) / (n_tup_ins+ n_tup_upd + n_tup_del) AS del_percent
-    ,100*cast(n_tup_ins AS numeric) / (n_tup_ins + n_tup_upd + n_tup_del) AS ins_percent
-    FROM pg_stat_user_tables
-    WHERE (n_tup_ins + n_tup_upd + n_tup_del) > 0
-    ORDER BY coalesce(n_tup_upd,0)+coalesce(n_tup_del,0) desc ) a limit 10;"""
-
-    # Top 10 Read IO tables
-    sql16 = """SELECT
-    relname
-    ,round((100.0 * heap_blks_hit/nullif(heap_blks_hit + heap_blks_read, 0))::numeric,2) AS hit_percent
-    ,heap_blks_hit
-    ,heap_blks_read
-    FROM pg_statio_user_tables
-    WHERE (heap_blks_hit + heap_blks_read) >0
-    ORDER BY coalesce(heap_blks_hit,0)+coalesce(heap_blks_read,0) desc limit 10;"""
 
     newline = "\n"
     # Generating HTML file
@@ -430,6 +288,7 @@ def lambda_handler(event, context):
     html = html + str(cur.fetchone()[0]) + newline
     html = html + "<br>"
     html = html + "Idle Connections : "
+    sql1 = open('sql/sql1.sql', 'r').read().replace('\n', '')
     cur.execute(sql1)
     html = html + str(cur.fetchone()[0]) + newline
     html = html + "<br>"
@@ -474,6 +333,7 @@ def lambda_handler(event, context):
     html = html + "<br>"
     html = html + """<font face="verdana" color="#ff6600">Total Size of ALL Databases:  </font>"""
 
+    sql3 = open('sql/sql3.sql', 'r').read().replace('\n', '')
     cur.execute(sql3)
     html = html + str(cur.fetchone()[0]) + " Bytes" + newline
     html = html + "<br>"
@@ -485,36 +345,37 @@ def lambda_handler(event, context):
     html = html + "<br>"
 
     cur.execute("SELECT count(*) from pg_database")
-    html = html + table_creator("Top 5 Databases Size ("+str(cur.fetchone()[0]) + "):", ["datname", "db_size", "pretty_db_size"], cur, sql2)
+
+    html = html + table_creator("Top 5 Databases Size ("+str(cur.fetchone()[0]) + "):", ["datname", "db_size", "pretty_db_size"], cur, "sql2")
 
     cur.execute("select count(*) from  pg_stat_user_tables")
-    html = html + table_creator("Top 10 Biggest Tables ("+str(cur.fetchone()[0]) + "):", ["table_schema", "table_name", "total_size", "data_size", "index_size"], cur, sql4)
+    html = html + table_creator("Top 10 Biggest Tables ("+str(cur.fetchone()[0]) + "):", ["table_schema", "table_name", "total_size", "data_size", "index_size"], cur, "sql4")
 
-    html = html + table_creator("Duplicate Indexes: ", ["size", "idx1", "total_size", "idx2", "idx3"], cur, sql5)
+    html = html + table_creator("Duplicate Indexes: ", ["size", "idx1", "total_size", "idx2", "idx3"], cur, "sql5")
 
-    html = html + table_creator("Unused Indexes: ", ["schemaname", "tablename", "indexname", "index_size"], cur, sql6)
+    html = html + table_creator("Unused Indexes: ", ["schemaname", "tablename", "indexname", "index_size"], cur, "sql6")
 
-    html = html + table_creator("Database Age: ", ["datname", "age"], cur, sql7)
+    html = html + table_creator("Database Age: ", ["datname", "age"], cur, "sql7")
 
-    html = html + table_creator("Top 10 Most Bloated Tables: ", ["current_database", "schemaname", "tablename", "tbloat", "wastedbytes", "iname", "ibloat", "wastedibytes"], cur, sql8)
+    html = html + table_creator("Top 10 Most Bloated Tables: ", ["current_database", "schemaname", "tablename", "tbloat", "wastedbytes", "iname", "ibloat", "wastedibytes"], cur, "sql8")
 
-    html = html + table_creator("Top 10 Biggest Tables Last Vacuumed: ", ["schemaname", "relname", "last_vacuum", "date", "date", "date", "table_total_size"], cur, sql9)
+    html = html + table_creator("Top 10 Biggest Tables Last Vacuumed: ", ["schemaname", "relname", "last_vacuum", "date", "date", "date", "table_total_size"], cur, "sql9")
 
-    html = html + table_creator("Top 10 UPDATE/DELETE Tables: ", ["relname", "hit_percent", "delete_percent", "insert_percent"], cur, sql15)
+    html = html + table_creator("Top 10 UPDATE/DELETE Tables: ", ["relname", "hit_percent", "delete_percent", "insert_percent"], cur, "sql15")
 
-    html = html + table_creator("Top 10 Read IO Tables: ", ["relname", "hit_percent", "heap_blks_hit", "heap_blks_read"], cur, sql16)
+    html = html + table_creator("Top 10 Read IO Tables: ", ["relname", "hit_percent", "heap_blks_hit", "heap_blks_read"], cur, "sql16")
 
-    html = html + table_creator("Vacuum Parameters: ", ["name", "setting", "source", "context"], cur, "select name, setting, source, context from pg_settings where name like 'autovacuum%'")
+    html = html + table_creator("Vacuum Parameters: ", ["name", "setting", "source", "context"], cur, "sql17")
 
-    html = html + table_creator("Memory Parameters: ", ["name", "setting", "source", "context"], cur, sql10)
+    html = html + table_creator("Memory Parameters: ", ["name", "setting", "source", "context"], cur, "sql10")
 
-    html = html + table_creator("Performance Parameters: ", ["name", "setting"], cur, sql11)
+    html = html + table_creator("Performance Parameters: ", ["name", "setting"], cur, "sql11")
 
     cur.execute("select * FROM pg_extension")
     if "pg_stat_statements" in str(cur.fetchall()):
-        html = html + table_creator("Top 10 CPU Consuming SQLs: ", ["short_query", "total_time", "calls", "mean", "percentage_cpu"], cur, sql12)
-        html = html + table_creator("Top 10 Read Queries: ", ["short_query", "total_time", "calls", "shared_blks_read", "shared_blks_hit", "hit_percent"], cur, sql13)
-        html = html + table_creator("Top 10 Write Queries: ", ["short_query", "total_time", "calls", "rows", "volume"], cur, sql14)
+        html = html + table_creator("Top 10 CPU Consuming SQLs: ", ["short_query", "total_time", "calls", "mean", "percentage_cpu"], cur, "sql12")
+        html = html + table_creator("Top 10 Read Queries: ", ["short_query", "total_time", "calls", "shared_blks_read", "shared_blks_hit", "hit_percent"], cur, "sql13")
+        html = html + table_creator("Top 10 Write Queries: ", ["short_query", "total_time", "calls", "rows", "volume"], cur, "sql14")
 
     else:
         html = html + "<br>"
@@ -530,26 +391,7 @@ def lambda_handler(event, context):
     f.write(html)
     f.close()
 
-    accountID = boto3.client('sts').get_caller_identity().get('Account')
-    bucket_name = "rds-reports-"+accountID
-    try:
-        s3.meta.client.head_bucket(Bucket=bucket_name)
-        print("Bucket Exists")
-    except ClientError as e:
-        print("Bucket Does Not Exist!")
-        if aws_region == "us-east-1":
-            s3client.create_bucket(Bucket=bucket_name, ACL='private',)
-        else:
-            location = {"LocationConstraint": aws_region}
-            s3client.create_bucket(
-                Bucket=bucket_name,
-                CreateBucketConfiguration=location
-            )
-            s3client.put_bucket_encryption(Bucket=bucket_name, ServerSideEncryptionConfiguration={'Rules': [{'ApplyServerSideEncryptionByDefault': {'SSEAlgorithm': 'AES256', }}]})
-    s3.meta.client.upload_file(filename, bucket_name,
-                               datetime.datetime.now()
-                               .strftime("%m-%d-%Y-T%H:%M:%S") + rdsname
-                               + "-report.html")
+    s3_create_upload(filename)
 
     return {
         "statusCode": 200,
