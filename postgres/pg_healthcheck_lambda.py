@@ -210,7 +210,9 @@ def lambda_handler(event, context):
         rds_details = rdsclient.describe_db_instances(DBInstanceIdentifier=db_obj["id"])
     elif db_obj["type"] == "aurora":
         rds_cluster = rdsclient.describe_db_clusters(DBClusterIdentifier=db_obj["id"])
-        db_obj["dbinstance"] = rds_cluster["DBClusters"][0]["DBClusterMembers"][0]["DBInstanceIdentifier"]
+        for cluster_instance in rds_cluster["DBClusters"][0]["DBClusterMembers"]:
+                if cluster_instance["IsClusterWriter"]:
+                    db_obj["dbinstance"] = cluster_instance["DBInstanceIdentifier"]
         rds_details = rdsclient.describe_db_instances(DBInstanceIdentifier=db_obj["dbinstance"])
 
     newline = "\n"
