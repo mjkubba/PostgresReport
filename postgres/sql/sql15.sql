@@ -9,4 +9,4 @@ SELECT relname
   ,100*cast(n_tup_ins AS numeric) / (n_tup_ins + n_tup_upd + n_tup_del) AS ins_percent
   FROM pg_stat_user_tables
   WHERE (n_tup_ins + n_tup_upd + n_tup_del) > 0
-  ORDER BY coalesce(n_tup_upd,0)+coalesce(n_tup_del,0) desc ) a limit 10;
+  ORDER BY coalesce(n_tup_upd,0)+coalesce(n_tup_del,0) desc ) a limit 25;

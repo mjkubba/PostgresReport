@@ -5,4 +5,4 @@ SELECT
   ,heap_blks_read
   FROM pg_statio_user_tables
   WHERE (heap_blks_hit + heap_blks_read) >0
-  ORDER BY coalesce(heap_blks_hit,0)+coalesce(heap_blks_read,0) desc limit 10;
+  ORDER BY coalesce(heap_blks_hit,0)+coalesce(heap_blks_read,0) desc limit 25;
