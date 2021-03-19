@@ -34,20 +34,7 @@ def check_input(input_obj):
     if "sid" in input_obj:
         return(True)
     else:
-        if "endpoint" not in input_obj:
-            print("missing endpoint")
-            return(False)
-        elif "rdsport" not in input_obj:
-            print("missing rdsport")
-            return(False)
-        elif "masteruser" not in input_obj:
-            print("missing masteruser")
-            return(False)
-        elif "mypass" not in input_obj:
-            print("missing mypass")
-            return(False)
-        else:
-            return(True)
+        return(False)
 
 
 def get_secret(secret_name):
