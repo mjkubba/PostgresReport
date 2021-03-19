@@ -20,4 +20,4 @@ SELECT current_database(), schemaname, tablename, /*reltuples::bigint, relpages:
           CASE WHEN v ~ 'mingw32' THEN 8 ELSE 4 END AS ma
         FROM (SELECT version() AS v) AS foo ) AS constants GROUP BY 1,2,3,4,5 ) AS foo ) AS rs JOIN pg_class cc ON cc.relname = rs.tablename
   JOIN pg_namespace nn ON cc.relnamespace = nn.oid AND nn.nspname = rs.schemaname AND nn.nspname <> 'information_schema'
-  LEFT JOIN pg_index i ON indrelid = cc.oid LEFT JOIN pg_class c2 ON c2.oid = i.indexrelid ) AS sml ORDER BY wastedbytes DESC LIMIT 10;
+  LEFT JOIN pg_index i ON indrelid = cc.oid LEFT JOIN pg_class c2 ON c2.oid = i.indexrelid ) AS sml ORDER BY wastedbytes DESC LIMIT 25;

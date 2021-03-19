@@ -11,4 +11,4 @@ SELECT
     or query ilike '%delete%')
     and query not like '%aurora_replica_status%'
     and query not like '%rds_heartbeat%'
-  ORDER BY Volume DESC LIMIT 10;
+  ORDER BY Volume DESC LIMIT 25;

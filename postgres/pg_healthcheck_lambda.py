@@ -335,10 +335,10 @@ def lambda_handler(event, context):
 
     cur.execute("SELECT count(*) from pg_database")
 
-    html = html + table_creator("Top 5 Databases Size ("+str(cur.fetchone()[0]) + "):", ["datname", "db_size", "pretty_db_size"], cur, "sql2")
+    html = html + table_creator("Top 25 Databases Size ("+str(cur.fetchone()[0]) + "):", ["datname", "db_size", "pretty_db_size"], cur, "sql2")
 
     cur.execute("select count(*) from  pg_stat_user_tables")
-    html = html + table_creator("Top 10 Biggest Tables ("+str(cur.fetchone()[0]) + "):", ["table_schema", "table_name", "total_size", "data_size", "index_size"], cur, "sql4")
+    html = html + table_creator("Top 25 Biggest Tables ("+str(cur.fetchone()[0]) + "):", ["table_schema", "table_name", "total_size", "data_size", "index_size"], cur, "sql4")
 
     html = html + table_creator("Duplicate Indexes: ", ["size", "idx1", "total_size", "idx2", "idx3"], cur, "sql5")
 
@@ -346,13 +346,13 @@ def lambda_handler(event, context):
 
     html = html + table_creator("Database Age: ", ["datname", "age"], cur, "sql7")
 
-    html = html + table_creator("Top 10 Most Bloated Tables: ", ["current_database", "schemaname", "tablename", "tbloat", "wastedbytes", "iname", "ibloat", "wastedibytes"], cur, "sql8")
+    html = html + table_creator("Top 25 Most Bloated Tables: ", ["current_database", "schemaname", "tablename", "tbloat", "wastedbytes", "iname", "ibloat", "wastedibytes"], cur, "sql8")
 
-    html = html + table_creator("Top 10 Biggest Tables Last Vacuumed: ", ["schemaname", "relname", "last_vacuum", "date", "date", "date", "table_total_size"], cur, "sql9")
+    html = html + table_creator("Top 25 Biggest Tables Last Vacuumed: ", ["schemaname", "relname", "last_vacuum", "date", "date", "date", "table_total_size"], cur, "sql9")
 
-    html = html + table_creator("Top 10 UPDATE/DELETE Tables: ", ["relname", "hit_percent", "delete_percent", "insert_percent"], cur, "sql15")
+    html = html + table_creator("Top 25 UPDATE/DELETE Tables: ", ["relname", "hit_percent", "delete_percent", "insert_percent"], cur, "sql15")
 
-    html = html + table_creator("Top 10 Read IO Tables: ", ["relname", "hit_percent", "heap_blks_hit", "heap_blks_read"], cur, "sql16")
+    html = html + table_creator("Top 25 Read IO Tables: ", ["relname", "hit_percent", "heap_blks_hit", "heap_blks_read"], cur, "sql16")
 
     html = html + table_creator("Vacuum Parameters: ", ["name", "setting", "source", "context"], cur, "sql17")
 
@@ -362,9 +362,9 @@ def lambda_handler(event, context):
 
     cur.execute("select * FROM pg_extension")
     if "pg_stat_statements" in str(cur.fetchall()):
-        html = html + table_creator("Top 10 CPU Consuming SQLs: ", ["short_query", "total_time", "calls", "mean", "percentage_cpu"], cur, "sql12")
-        html = html + table_creator("Top 10 Read Queries: ", ["short_query", "total_time", "calls", "shared_blks_read", "shared_blks_hit", "hit_percent"], cur, "sql13")
-        html = html + table_creator("Top 10 Write Queries: ", ["short_query", "total_time", "calls", "rows", "volume"], cur, "sql14")
+        html = html + table_creator("Top 25 CPU Consuming SQLs: ", ["short_query", "total_time", "calls", "mean", "percentage_cpu"], cur, "sql12")
+        html = html + table_creator("Top 25 Read Queries: ", ["short_query", "total_time", "calls", "shared_blks_read", "shared_blks_hit", "hit_percent"], cur, "sql13")
+        html = html + table_creator("Top 25 Write Queries: ", ["short_query", "total_time", "calls", "rows", "volume"], cur, "sql14")
 
     else:
         html = html + "<br>"
