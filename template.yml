@@ -3,7 +3,9 @@ Transform: 'AWS::Serverless-2016-10-31'
 Parameters:
   securityGroup:
     Type: AWS::EC2::SecurityGroup::Id
-  subnets:
+  subnet1:
+    Type: AWS::EC2::Subnet::Id
+  subnet2:
     Type: AWS::EC2::Subnet::Id
 
 Resources:
@@ -22,11 +24,10 @@ Resources:
       Runtime: python3.8
       Timeout: 180
       Events:
-        rdsFunction:
-          Type: HttpApi
+        postgresLambdaEvent:
+          Type: Schedule
           Properties:
-            Path: /
-            Method: get
+            Schedule: rate(6 hours)
       Policies:
       - Statement:
         - Sid: logsPol
@@ -67,4 +68,5 @@ Resources:
         SecurityGroupIds:
           - !Ref securityGroup
         SubnetIds:
-          - !Ref subnets
+          - !Ref subnet1
+          - !Ref subnet2
