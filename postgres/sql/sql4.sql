@@ -7,4 +7,4 @@ Select schemaname as table_schema,
   from pg_catalog.pg_statio_user_tables
   order by pg_total_relation_size(relid) desc,
           pg_relation_size(relid) desc
-  limit 10;
+  limit 25;

@@ -9,4 +9,4 @@ SELECT s.schemaname,
   AND NOT EXISTS          -- does not enforce a constraint
          (SELECT 1 FROM pg_catalog.pg_constraint c
           WHERE c.conindid = s.indexrelid)
-  ORDER BY pg_relation_size(s.indexrelid) DESC limit 15;
+  ORDER BY pg_relation_size(s.indexrelid) DESC limit 25;
