@@ -7,6 +7,8 @@ Parameters:
     Type: AWS::EC2::Subnet::Id
   subnet2:
     Type: AWS::EC2::Subnet::Id
+  secid:
+    Type: String
 
 Resources:
   rdsFunction:
@@ -27,6 +29,7 @@ Resources:
         postgresLambdaEvent:
           Type: Schedule
           Properties:
+            Input: !Join ['',["{\"body\": { \"sid\":\"",!Ref secid,"\" }}"]]
             Schedule: rate(6 hours)
       Policies:
       - Statement:

@@ -112,9 +112,12 @@ def table_creator(top, headers, cur, sqlname):
 def get_obj(event):
     """Get the event object."""
     if "body" in event and event["body"]:
-        event = json.loads(event["body"])
-        if "sid" in event:
-            err_check, db_obj = get_secret(event["sid"])
+        if isinstance(event["body"], str):
+            parsed_event = json.loads(event["body"])
+        else:
+            parsed_event = event["body"]
+        if "sid" in parsed_event:
+            err_check, db_obj = get_secret(parsed_event["sid"])
             return(err_check, db_obj)
         else:
             return(False, event)
@@ -165,8 +168,12 @@ def s3_create_upload(filename):
 def lambda_handler(event, context):
     """Handle the lambda event."""
     err_check = False
+    input_validator = False
     if "body" in event and event["body"]:
-        input_validator = check_input(json.loads(event["body"]))
+        if isinstance(event["body"], str):
+            input_validator = check_input(json.loads(event["body"]))
+        else:
+            input_validator = check_input(event["body"])
         err_check, db_obj = get_obj(event)
     elif "queryStringParameters" in event and event["queryStringParameters"]:
         input_validator = check_input(event["queryStringParameters"])
