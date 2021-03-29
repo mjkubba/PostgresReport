@@ -1,6 +1,28 @@
 ## Purpose
-Lambda with schedule (Amazon Eventbridge) of every 6 hours, Query and report RDS/Aurora Postgres information.   
-Generates HTML file \<date>-report.html after each run and save to S3 bucket in the customer account.   
+Lambda with schedule (Amazon Eventbridge) of every 6 hours, Query and report RDS/Aurora Postgres information not available via performance insights. After each run the lambda generates HTML file \<date>-report.html after each run and save to S3 bucket in the your account.   
+
+### Insights:
+* General Instance Details and Configuration
+* Total Size of Log Files
+* Total Size of ALL Databases
+* Maximum Used Transaction IDs
+* Top 25 Databases Size
+* Top 25 Biggest Tables
+* Duplicate Indexes
+* Unused Indexes
+* Database Age
+* Top 25 Most Bloated Tables
+* Top 25 Biggest Tables Last Vacuumed
+* Top 25 UPDATE/DELETE Tables
+* Top 25 Read IO Tables
+* Vacuum Parameters
+* Memory Parameters
+* Performance Parameters
+* Top 25 CPU Consuming SQLs*
+* Top 25 Read Queries*
+* Top 25 Write Queries*
+
+*if you have pg_stat_statements installed, will skip if not.
 
 ## Architecture:
 ![architecture](architecture.png)
