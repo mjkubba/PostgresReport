@@ -135,7 +135,7 @@ def s3_create_upload(filename):
     s3 = boto3.resource('s3', region_name=aws_region)
     s3client = boto3.client('s3', region_name=aws_region)
     accountID = boto3.client('sts').get_caller_identity().get('Account')
-    bucket_name = "rds-reports-"+accountID
+    bucket_name = "rds-reports-"+aws_region+"-"+accountID
     bucket_exist = True
     try:
         s3.meta.client.head_bucket(Bucket=bucket_name)

@@ -1,9 +1,31 @@
 ## Purpose
-Query and report RDS/Aurora Postgres information Every 6 hours.   
-Generates HTML file \<date>-report.html   
+Lambda with schedule (Amazon Eventbridge) of every 6 hours, Query and report RDS/Aurora Postgres information.   
+Generates HTML file \<date>-report.html after each run and save to S3 bucket in the customer account.   
+
+## Architecture:
+![architecture](architecture.png)
+
+### Requirements:
+* VPC with private subnets.
+* A postgres database!.
+* DB username and password stored in Secrets Manager.
+
+### Artifacts and Components:
+* Lambda function.
+  * with 1 3rd party Component (psycopg2)
+* Eventbridge schedule.
+* S3 Bucket (one per region per account).
+  * recommended that you enable access logging manually to your logging bucket.
+* html files in the bucket.
+* IAM role:
+  * logs: (PutLogEvents, CreateLogStream, CreateLogGroup) for lambda send put logs to cloudwatch.
+  * s3: (PutObject, ListBucket, CreateBucket, PutEncryptionConfiguration) to create and upload files to S3.
+  * rds: (DescribeDBLogFiles, DescribeDBClusters, DescribeDBInstances) to get RDS/Aurora information.
+  * sts: (getCallerIdentity) for getting the account number.
+  * secretsmanager: (GetSecretValue) to get the credentials and other DB information from SecretsManager
 
 ### Inputs
-#### SAM template
+#### SAM template inputs
 * stack-name: the new stack name
 * s3-bucket: Bucket where the SAM package will be uploaded
 * capabilities CAPABILITY_IAM: needed for creating the role
@@ -14,7 +36,7 @@ Generates HTML file \<date>-report.html
   * region: AWS region where the lambda need to be deployed
   * secid: the secrets manager secretID where the DB details stored
 
-#### Lambda
+#### Lambda inputs
 Required input (handled by EventBridge):     
 * sid
 
@@ -34,14 +56,14 @@ OR
 http://127.0.0.1:3000/?sid=demo-postgres
 ```
 ## Networking:
-This lambda need to be in a VPC that able to connect to the target Database, in a private subnet that have access to the internet or have the following endpoints enabled:
+This lambda need to be in a VPC with connectivity to the target Database, in a private subnet that have access to the internet or have the following endpoints enabled:
 * STS
 * S3
 * RDS
 * Secrets Manager
 
 ### Outputs:
-Create S3 Bucket with name (if not there): \<AccountID>-rdsreports   
+Create S3 Bucket with name (if not there): rds-reports-\<aws_region>-\<accountID>   
 Save reports to that bucket after each run with name: \<datetime>-\<rdsName>report.html
 
 ### Local testing:
@@ -49,13 +71,8 @@ to start locally:
 `sam build && sam local start-api`
 
 ### Using SAM to Deploy
-`sam build && sam deploy --stack-name <NEWSTACKNAME> --s3-bucket <EXISTINGS3BUCKET> --capabilities CAPABILITY_IAM --parameter-overrides securityGroup=sg-1234567890 subnets=subnet-1111111111111 --region <REGION> secid=<secretID>`
+`sam build && sam deploy --stack-name <NEWSTACKNAME> --s3-bucket <EXISTINGS3BUCKET> --capabilities CAPABILITY_IAM --parameter-overrides securityGroup=sg-1234567890 subnet1=subnet-1111111111111 subnet2=subnet-2222222222 --region <REGION> secid=<secretID>`
 
 ### TODO:
-* ~~Refactor functions~~
-* ~~Check for and create S3 buckets~~
-* ~~Implement secret retrieval~~
-* ~~limit the IAM to min required~~
-* ~~Work with hanishg@ for test DBs~~
-* ~~Add other regions~~
 * Make the html human readable!
+* add auto-logging to the s3 bucket
