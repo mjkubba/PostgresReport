@@ -397,4 +397,23 @@ def lambda_handler(event, context):
         }
     }
 
+
+def flask_controller():
+    """Handle the flask event."""
+    if request.data:
+        event = {"body": {"sid": request.get_json(force=True)["sid"]}}
+    elif request.args:
+        if "sid" in request.args:
+            event = {"body": {"sid": request.args.get('sid')}}
+    return(lambda_handler(event, "test")["body"])
+
+
+if __name__ == "__main__":
+    from flask import Flask
+    from flask import request
+    app = Flask(__name__)
+    app.add_url_rule("/", "flask_controller", flask_controller)
+    app.run()
+
+
 #  pylama:ignore=E501,C901
