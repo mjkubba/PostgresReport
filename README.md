@@ -95,6 +95,9 @@ to start locally:
 ### Using SAM to Deploy
 `sam build && sam deploy --stack-name <NEWSTACKNAME> --s3-bucket <EXISTINGS3BUCKET> --capabilities CAPABILITY_IAM --parameter-overrides securityGroup=sg-1234567890 subnet1=subnet-1111111111111 subnet2=subnet-2222222222 --region <REGION> secid=<secretID>`
 
+## Docker:
+Work in progress, added docker file, changed the code to include and run flask server and if the python was executed locally aka not lambda.
+
 ### TODO:
 * Make the html human readable!
 * add auto-logging to the s3 bucket
