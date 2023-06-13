@@ -100,4 +100,6 @@ Work in progress, added docker file, changed the code to include and run flask s
 
 ### TODO:
 * Make the html human readable!
+* Add to CloudWatch custom metrics
+   * Enable CloudWatch anomaly detection
 * add auto-logging to the s3 bucket
